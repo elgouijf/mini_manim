@@ -1,4 +1,5 @@
 import numpy as np
+from collections import namedtuple
 class Mobject:
     def __init__(self):
         # start with no poinst (i.e 0 rows)
@@ -122,6 +123,10 @@ class VMobject(Mobject):
     def __init__(self):
         super().__init__()
         self.closed = False # This tells the renderer if the shape is closed (A->B->C->A) or open (A->B->C)
+        # self.subpaths = {path : closed_bool} won't work since numpy array are not hachable (because they're mutable)
+        #same goes with named tuples so we'll just se parallel lists
+        self.subpaths = []
+        self.closed_subpaths = []
 
     def set_corners(self, corners):
         self.points = np.array(corners) # just to be safe we'll apply an np.array on the corners iterable
@@ -129,3 +134,10 @@ class VMobject(Mobject):
     def add_line(self, point):
         # this will connect the last point of our VMobject to anew one creating a new line
         self.points = np.vstack([self.points, point])
+
+    def close(self):
+        self.close = True
+
+    def add_subpath(self, point, closed = False):
+        self.subpaths.append(np.array(point))
+        self.closed_subpaths.append(closed)
