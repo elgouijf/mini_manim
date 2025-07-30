@@ -1,14 +1,14 @@
 import numpy as np
-from collections import namedtuple
-
+from ..config import *
 class Mobject:
-    def __init__(self):
+    def __init__(self, **settings):
         # start with no poinst (i.e 0 rows)
         self.points = np.zeros((0,2))
 
-        self.fill_color = None # self.fill_color = Color(color)
-        self.stroke_color = None
-
+        self.stroke_color = settings.get("stroke_color", DEFAULT_STROKE_COLOR)
+        self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
+        self.fill_color = settings.get("fill_color", DEFAULT_FILL_COLOR)
+        self.fill_opacity = settings.get("fill_opacity", DEFAULT_FILL_OPACITY)
         self.transform_matrix = np.identity(3) # we'll be using homogenous coordinates
 
         self.submobjects = [] # object starts with no children
