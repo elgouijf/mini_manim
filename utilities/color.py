@@ -12,7 +12,7 @@ ORANGE = Color("orange")
 
 def ensure_color(color):
     if isinstance(color, Color):
-        return color
+        return color # just beware from the border effects(we're not using copies here)
 
     if isinstance(color, str):
         try:
@@ -21,8 +21,14 @@ def ensure_color(color):
             raise ValueError("Invalid color string")
 
     if isinstance(color, tuple) and len(color) == 3:
-        return Color(rgb = color)
 
+        if all(0 <= c <= 1 for c in color):
+            return Color(rgb=color)
+        elif all(0 <= c <= 255 for c in color):
+            return Color(rgb=tuple(c / 255 for c in color))
+        else:
+            raise ValueError("RGB tuple values must be in range [0, 1] or [0, 255]")
+    
     raise TypeError(f"Cannot convert type {type(color)} to Color")
 
 
@@ -120,8 +126,22 @@ print(Color("green").get_rgb())
 assert hex_to_rgb("#00FF00") == Color("green").get_rgb()
  """
 # Blend test
-assert blend(["red", "blue"]) == Color(rgb = (0.5, 0.0, 0.5))  # purple-ish
+def colors_almost_equal(c1, c2, tol=1e-6):
+    r1, g1, b1 = ensure_color(c1).get_rgb()
+    r2, g2, b2 = ensure_color(c2).get_rgb()
+    return all(abs(a - b) < tol for a, b in zip((r1, g1, b1), (r2, g2, b2)))
+
+assert colors_almost_equal(blend(["red", "blue"]), Color(rgb = (0.5, 0.0, 0.5)))
+
 
 # Invert test
 assert invert_color("white") == Color("black")
 assert invert_color("black") == Color("white")
+
+#gradient test
+gradient = color_gradient(["red", "blue"], 3)
+print(gradient)
+print('#7F007F')
+assert len(gradient) == 3
+assert colors_almost_equal(gradient[0], "red")
+assert colors_almost_equal(gradient[-1], "blue")
