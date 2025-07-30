@@ -1,11 +1,12 @@
 import numpy as np
 from collections import namedtuple
+
 class Mobject:
     def __init__(self):
         # start with no poinst (i.e 0 rows)
         self.points = np.zeros((0,2))
 
-        self.fill_color = None
+        self.fill_color = None # self.fill_color = Color(color)
         self.stroke_color = None
 
         self.transform_matrix = np.identity(3) # we'll be using homogenous coordinates
@@ -136,8 +137,22 @@ class VMobject(Mobject):
         self.points = np.vstack([self.points, point])
 
     def close(self):
-        self.close = True
+        self.closed = True
 
-    def add_subpath(self, point, closed = False):
-        self.subpaths.append(np.array(point))
+    def add_subpaths(self, points, closed = False):
+        self.subpaths.append(np.array(points))
         self.closed_subpaths.append(closed)
+
+    def interpolate(self, vomb1, vomb2, t):
+        "nterpolation will help us cover whatever segment in a space to create an animating effect"
+        self.points = (1 - t)*vomb1.points + t*vomb2.points
+
+    
+    def set_fill_color(self, color):
+        self.fill_color = color
+
+
+    def set_stroke_color(self, color):
+        self.stroke_color = color
+
+    
