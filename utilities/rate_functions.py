@@ -1,6 +1,10 @@
 from math import *
 import numpy as np
 
+def linear(t):
+    # keeps the evolution of the system as it is, good for mathematically accurate illustrations
+    return t
+
 def smooth(t):
     # ease-in-out rate function
     if t > 1 or t < 0:
