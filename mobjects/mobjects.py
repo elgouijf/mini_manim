@@ -1,5 +1,8 @@
 import numpy as np
 from ..config import *
+from math import cos, sin, tan, pi
+from ..utilities.bezier import *
+
 class Mobject:
     def __init__(self, **settings):
         # start with no poinst (i.e 0 rows)
@@ -121,8 +124,8 @@ class Group(Mobject):
 
 
 class VMobject(Mobject):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **settings):
+        super().__init__(**settings)
         self.closed = False # This tells the renderer if the shape is closed (A->B->C->A) or open (A->B->C)
         # self.subpaths = {path : closed_bool} won't work since numpy array are not hachable (because they're mutable)
         #same goes with named tuples so we'll just se parallel lists
@@ -155,4 +158,82 @@ class VMobject(Mobject):
     def set_stroke_color(self, color):
         self.stroke_color = color
 
+
+class Circle(VMobject):
+
+    def __init__(self, n_segments = 4, center = np.array[0,0], radius = 1.0, n_bezier_points = 59, **settings):
+        super().__init__(**settings) # this will take care of all settings
+        self.radius = radius
+        self.close()
+        if n_segments % 4 != 0:
+            raise ValueError("n_segment must be a multiple of 4 (4 included)")
+        elif n_segments:
+            self.n_segments = n_segments #setting the number of points the circle is made of
+        self.generate_circle(center, n_bezier_points)
+
     
+        
+    def generate_circle(self, center, n_bezier_points):
+        radius = self.radius
+        n_segments = self.n_segments
+        theta = (2*pi)/n_segments
+
+        if n_segments == 4:
+            kappa = 0.5522847498 # this is (4*radius*tan((pi/2)/4))/3
+        elif theta < pi/12 :
+            # for a small theta we can go to the first order of tan and still maintain a good quality
+            kappa = (radius*theta) / 3
+        else:
+            # we use the midpoint method/ cross product to determine a good estimation for kappa
+            kappa = (4*radius*tan(theta/4))/3
+
+        
+        circle = []
+        for i in range(n_segments):
+            start_angle = theta*i
+            end_angle = theta*(i + 1)
+
+            # Compute enpoints of the arc
+            p0 = np.array([radius*cos(start_angle), radius*sin(start_angle)])
+            p3 = np.array([radius*cos(end_angle), radius*sin(end_angle)])
+
+            # Compute Tangents(Direction vectors)
+            T0 = np.array([-radius*sin(start_angle), radius*cos(start_angle)])
+            T1 = np.array([-radius*sin(end_angle), -radius*cos(end_angle)])
+
+            # Compute control points
+            p1 = p0 + kappa*T0/np.linalg.norm(T0) #we're sure that the direction will never be 0 because it's a circle
+            p2 = p3 - kappa*T1/np.linalg.norm(T1)
+
+            for t in np.linspace(0, 1, n_bezier_points):
+                point = bezier_cubic(t, p0, p1, p2, p3)
+                circle.append(point + center)
+
+        self.add_subpaths(circle, closed=True)
+
+
+class Square(VMobject):
+    def __init__(self, side_len, **settings):
+        super().__init__(**settings)
+        self.close()
+        self.generate_square(side_len)
+    
+    def generate_square(self, side_len):
+        half = side_len/2
+
+        # Define corners
+        p1 = np.array([-half, half])
+        p2 = np.array([-half, half])
+        p3 = np.array([-half, half])
+        p4 = np.array([-half, half])
+
+        # Create the sides
+        l1 = line(p1, p2)
+        l1 = line(p2, p3)
+        l3 = line(p3, p4)
+        l4 = line(p4, p1)
+
+        
+        
+
+        
