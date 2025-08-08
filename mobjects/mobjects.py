@@ -11,12 +11,16 @@ class Mobject:
         self.stroke_color = settings.get("stroke_color", DEFAULT_STROKE_COLOR)
         self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
         self.fill_color = settings.get("fill_color", DEFAULT_FILL_COLOR)
-        self.fill_opacity = settings.get("fill_opacity", DEFAULT_FILL_OPACITY)
+        self.opacity = settings.get("fill_opacity", DEFAULT_FILL_OPACITY)
         self.transform_matrix = np.identity(3) # we'll be using homogenous coordinates
 
         self.submobjects = [] # object starts with no children
 
-        self.name = self.__class__.__name__ # object gets the name of the runtime class of the instance (Mobject or a subclass) 
+        self.name = self.__class__.__name__ # object gets the name of the runtime class of the instance (Mobject or a subclass)
+
+    def interpolate(self, mob1, mob2, t):
+        "nterpolation will help us cover whatever segment in a space to create an animating effect"
+        self.points = (1 - t)*mob1.points + t*mob2.points 
 
     def get_center(self):
         return np.mean(self.points, axis = 0) # axis = 0 => mean over columns
@@ -75,7 +79,7 @@ class Mobject:
     def rotate(self, theta):
 
         center = self.get_center()
-        T1 = self.get_translation_matrix(*(-center)) # This grants us a shift-back to the origin before scaling
+        T1 = self.get_translation_matrix(*(-center)) # This grants us a shift-back to the origin before rotating
 
         R = np.array([[np.cos(theta), -np.sin(theta), 0],
                                     [np.sin(theta), np.cos(theta), 0],
@@ -94,7 +98,20 @@ class Mobject:
         self.points = tarsnformed_points_homogenous[:, :2]
         # reset transform_matrix
         self.transform_matrix = np.identity(3)
+
+    def set_opacity(self, opacity):
+        self.opacity = opacity
+
+        
+    def set_fill_color(self, color):
+        self.fill_color = color
+
+
+    def set_stroke_color(self, color):
+        self.stroke_color = color
     
+    def set_points(self, points):
+        self.points = points.copy()
 
 class Group(Mobject):
     def __init__(self, *mobjects):
@@ -146,17 +163,6 @@ class VMobject(Mobject):
         self.subpaths.append(np.array(points))
         self.closed_subpaths.append(closed)
 
-    def interpolate(self, vomb1, vomb2, t):
-        "nterpolation will help us cover whatever segment in a space to create an animating effect"
-        self.points = (1 - t)*vomb1.points + t*vomb2.points
-
-    
-    def set_fill_color(self, color):
-        self.fill_color = color
-
-
-    def set_stroke_color(self, color):
-        self.stroke_color = color
 
 class Line(VMobject):
     """
@@ -312,7 +318,7 @@ class Square(VMobject):
 
 
 class Polygon(VMobject):
-    def __init__(self, center=np.array([0,0]), radius = 2.0, n = 8.0 , **settings):
+    def __init__(self, center=np.array([0,0]), radius = 2.0, n = 8 , **settings):
         super().__init__(**settings)
         self.close()
         self.generate_polygon(center, n, radius)
@@ -324,9 +330,12 @@ class Polygon(VMobject):
                                     [np.sin(theta), np.cos(theta)],])
         
         for i in range(1, n):
-            corners.append = (Rotation @ corners[i - 1].T).T
+            corners.append(Rotation @ corners[i - 1].T).T
         
         for i in range(len(corners)):
             corners[i] += center
-            
+
         self.set_corners(corners)
+
+
+
