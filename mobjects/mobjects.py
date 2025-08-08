@@ -1,7 +1,7 @@
 import numpy as np
-from ..config import *
+from config import *
 from math import cos, sin, tan, pi
-from ..utilities.bezier import *
+from utilities.bezier import *
 
 class Mobject:
     def __init__(self, **settings):
@@ -248,7 +248,7 @@ class Line(VMobject):
 
 class Circle(VMobject):
 
-    def __init__(self, n_segments = 4, center = np.array[0,0], radius = 1.0, n_bezier_points = 59, **settings):
+    def __init__(self, n_segments = 4, center = np.array([0,0]), radius = 1.0, n_bezier_points = 59, **settings):
         super().__init__(**settings) # this will take care of all settings
         self.radius = radius
         self.close()
@@ -338,4 +338,19 @@ class Polygon(VMobject):
         self.set_corners(corners)
 
 
+<<<<<<< Updated upstream
 
+=======
+class Text(Mobject) :
+    """" Text Class """
+    def __init__(self, text, position, font, font_size, color) :
+        # call the __init__ method of the Mobject class (superclass)
+        super().__init__()      
+        self.text = text            # a string : the text we want to show
+        self.position = position    # the coordinates of the starting position of the text
+        self.font = font            
+        self.font_size = font_size
+        self.text_color = color     # a triplet (r,g,b)
+        
+        
+>>>>>>> Stashed changes

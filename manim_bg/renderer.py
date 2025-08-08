@@ -6,6 +6,8 @@ import cairo
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mobjects.mobjects as mbj
 import numpy as np
+
+
 WIDTH = 480
 HEIGHT = 360
 
@@ -86,7 +88,17 @@ class Renderer:
                 else:
                     continue
 
-            
+    def render_text(self, text_obj) :
+        ctx = self.ctx
+        ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+        ctx.set_font_size(text_obj.font_size)
+        ctx.set_source_rgb(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2])
+        x, y = text_obj.position 
+        ctx.move_to(x, y)
+        ctx.show_text(text_obj.text)
+
+
+
 class Scene:
     """"
     collection of objects to draw
@@ -178,4 +190,17 @@ def test_vmobject_open_and_closed():
     surface.write_to_png("vmobject_test_output.png")
     print("Saved to vmobject_test_output.png")
 
-test_vmobject_open_and_closed()
+#test_vmobject_open_and_closed()
+
+def test_text() :
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, WIDTH, HEIGHT)
+    ctx = cairo.Context(surface)
+    renderer = Renderer(surface, ctx)
+    ctx.set_source_rgb(1,1,1)
+    ctx.paint()
+    text_obj = mbj.Text("Hello, Mini Manim !", (50,50), "Sans", 32, (0.2, 0.2, 0.7))
+    renderer.render_text(text_obj)
+    surface.write_to_png("test_text_output.png")
+    print('Saved to test_text_output.png')
+
+test_text()
