@@ -159,6 +159,9 @@ class VMobject(Mobject):
     def close(self):
         self.closed = True
 
+    def open(self):
+        self.closed = False
+
     def add_subpaths(self, points, closed = False):
         self.subpaths.append(np.array(points))
         self.closed_subpaths.append(closed)
@@ -338,9 +341,6 @@ class Polygon(VMobject):
         self.set_corners(corners)
 
 
-<<<<<<< Updated upstream
-
-=======
 class Text(Mobject) :
     """" Text Class """
     def __init__(self, text, position, font, font_size, color) :
@@ -351,6 +351,3 @@ class Text(Mobject) :
         self.font = font            
         self.font_size = font_size
         self.text_color = color     # a triplet (r,g,b)
-        
-        
->>>>>>> Stashed changes
