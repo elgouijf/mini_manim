@@ -1,6 +1,5 @@
 import numpy as np
 from config import *
-from math import cos, sin, tan, pi
 from utilities.bezier import *
 
 class Mobject:
@@ -15,6 +14,7 @@ class Mobject:
         self.transform_matrix = np.identity(3) # we'll be using homogenous coordinates
 
         self.submobjects = [] # object starts with no children
+        self.updaters = []
 
         self.name = self.__class__.__name__ # object gets the name of the runtime class of the instance (Mobject or a subclass)
 
@@ -106,12 +106,23 @@ class Mobject:
     def set_fill_color(self, color):
         self.fill_color = color
 
-
     def set_stroke_color(self, color):
         self.stroke_color = color
     
     def set_points(self, points):
         self.points = points.copy()
+
+    def add_updater(self, update_func): #functions are objects too (in C it would've been a callback function but it is simpler in python)
+        self.updaters.append(update_func)
+
+    def remove_updater(self, update_func):
+        if update_func in self.updaters:
+            self.updaters.remove(update_func)
+
+    def run_updates(self, dt):
+        for updater in self.updaters:
+            updater(self, dt)
+            
 
 class Group(Mobject):
     def __init__(self, *mobjects):
@@ -266,16 +277,16 @@ class Circle(VMobject):
     def generate_circle(self, center, n_bezier_points):
         radius = self.radius
         n_segments = self.n_segments
-        theta = (2*pi)/n_segments
+        theta = (2*np.pi)/n_segments
 
         if n_segments == 4:
-            kappa = 0.5522847498 # this is (4*radius*tan((pi/2)/4))/3
-        elif theta < pi/12 :
+            kappa = 0.5522847498 # this is (4*radius*tan((np.pi/2)/4))/3
+        elif theta < np.pi/12 :
             # for a small theta we can go to the first order of tan and still maintain a good quality
             kappa = (radius*theta) / 3
         else:
             # we use the midpoint method/ cross product to determine a good estimation for kappa
-            kappa = (4*radius*tan(theta/4))/3
+            kappa = (4*radius*np.tan(theta/4))/3
 
         
         circle = []
@@ -284,12 +295,12 @@ class Circle(VMobject):
             end_angle = theta*(i + 1)
 
             # Compute enpoints of the arc
-            p0 = np.array([radius*cos(start_angle), radius*sin(start_angle)])
-            p3 = np.array([radius*cos(end_angle), radius*sin(end_angle)])
+            p0 = np.array([radius*np.cos(start_angle), radius*np.sin(start_angle)])
+            p3 = np.array([radius*np.cos(end_angle), radius*np.sin(end_angle)])
 
             # Compute Tangents(Direction vectors)
-            T0 = np.array([-radius*sin(start_angle), radius*cos(start_angle)])
-            T1 = np.array([-radius*sin(end_angle), -radius*cos(end_angle)])
+            T0 = np.array([-radius*np.sin(start_angle), radius*np.cos(start_angle)])
+            T1 = np.array([-radius*np.sin(end_angle), -radius*np.cos(end_angle)])
 
             # Compute control points
             p1 = p0 + kappa*T0/np.linalg.norm(T0) #we're sure that the direction will never be 0 because it's a circle
@@ -328,7 +339,7 @@ class Polygon(VMobject):
         
     def generate_polygon(self, center, n, radius):
         corners = [np.array([0, radius])]
-        theta = 2*pi/n
+        theta = 2*np.pi/n
         Rotation = np.array([[np.cos(theta), -np.sin(theta)],
                                     [np.sin(theta), np.cos(theta)],])
         

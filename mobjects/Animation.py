@@ -1,12 +1,14 @@
-import mobjects
+import mobjects.mobjects as mbj
 from ..utilities.rate_functions import *
 
 class Animation :
     def __init__(self, mobject, rate_time = 1.0, rate_function = smooth):
+        mobject.apply_transform()  # clear out any pending transforms
         self.mobject = mobject
         self.time = rate_time
         self.rate = rate_function
         self.starting_mobject = self.mobject.copy()
+        
 
 class Transform(Animation):
     def __init__(self, starting_mobject, target_mobject, rate_time=1, rate_function=smooth):
@@ -32,7 +34,7 @@ class Move(Animation):
     def interpolate(self, t):
         f_t = self.rate(t)
         inter_x = (1 -f_t)*self.starting_position[0] +f_t*self.target_point[0] 
-        inter_y = (1 - f_t)*self.starting_position[1] + f_t*self.target_point[1] 
+        inter_y = (1 - f_t)*self.starting_position[1] + f_t*self.target_point[1]
 
         self.mobject.move_to(inter_x, inter_y)
 
@@ -56,7 +58,8 @@ class Scale(Animation):
         s = self.scale
         self.mobject.set_points(self.starting_mobject.points)
         self.mobject.scale(s)
-    
+
+
 class Rotate(Animation):
     def __init__(self, mobject, theta, rate_time=1, rate_function=smooth):
         super().__init__(mobject, rate_time, rate_function)
