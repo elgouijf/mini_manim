@@ -6,12 +6,12 @@ down = "down"
 right = "right"
 left = "left"
 
-def rotate_continuous(mobj,  dt, ang_speed = np.pi/4):
+def rotate_continuous(mobj,  dt = 0.1, ang_speed = np.pi/4):
     """ ang_speed = #angle per second """
     mobj.rotate(ang_speed * dt)
 
 
-def move_continuous(mobj,direction, dt, lin_speed = 3):
+def move_continuous(mobj, direction = right, dt= 0.1, lin_speed = 3):
     center = mobj.get_center()
     x , y = center
 
@@ -28,11 +28,11 @@ def move_continuous(mobj,direction, dt, lin_speed = 3):
         mobj.move_to(x - lin_speed * dt, y)
 
 
-def scale_continous(mobj, dt, scale_speed = 0.3):
+def scale_continous(mobj, dt = 0.1, scale_speed = 0.3):
     mobj.scale(1 + scale_speed * dt)
 
 
-def oscillate_continous(mobj, dt, direction, frequency = 2, amplitude = 1, oscill_speed = 2): #spped covers the area between two local extremums in 1 second
+def oscillate_continous(mobj, dt = 0.1, direction = right, frequency = 2, amplitude = 1): 
     if not hasattr(mobj, "_start_point"):
         mobj._start_point = mobj.get_center()
 
