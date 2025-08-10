@@ -3,19 +3,34 @@ import os
 import sys
 import cairo
 
+
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import mobjects.mobjects as mbj
 import numpy as np
 
+import cv2
 
 WIDTH = 480
 HEIGHT = 360
 
+
 class Renderer:
     #object to draw
-    def __init__(self,im_surface,ctx):
+    def __init__(self,im_surface,ctx,fps = 10,width =WIDTH,height = HEIGHT,file_name = None):
         self.im_surface = im_surface
         self.ctx = ctx
+        self.fps = fps
+        self.width = width
+        self.height = height
+        self.file_name= file_name
+        if file_name:
+            self.video_writer = cv2.VideoWriter(
+                file_name,
+                cv2.VideoWriter_fourcc(*'mp4v'),
+                fps,
+                (width,height)
+            )
     def render_polygone(self,mobject):
         if mobject.points.shape[0] == 0:
             return#no points to draw
@@ -67,9 +82,9 @@ class Renderer:
                     points = subpath
                     for j in range(len(points)):
                         if not j:
-                            self.ctx.move_to(*points[0][:2])
+                            self.ctx.move_to(*points[0])
                         else:
-                            self.ctx.line_to(*points[j][:2])
+                            self.ctx.line_to(*points[j])
                     if vmobject.closed_subpaths[i]:
                         self.ctx.line_to(*points[0])
                     
@@ -87,7 +102,24 @@ class Renderer:
                     self.render_vm(submobject)
                 else:
                     continue
+    def render_arrow2d(self,arrow : mbj.Arrow2d):
+        end_point = arrow.offset + arrow.tip
+        tip = arrow.tip
+        self.ctx.move_to(*arrow.offset)
+        self.ctx.line_to(*end_point)
+        triangle = mbj.VMobject()
+        triangle.points = np.array([
+            [end_point[0]+0.1*tip[0],end_point[1] + 0.1*tip[1]],
+            [end_point[0] + 0.1*(1/2 *tip[0]  + np.sqrt(3)/2 *tip[1]),
+             end_point[1] + 0.1*(1/2 * tip[1] -np.sqrt(3)/2 *tip[0])],
+            [end_point[0] + 0.1*(1/2 *tip[0]  - np.sqrt(3)/2 *tip[1]),
+             end_point[1] + 0.1*(1/2 * tip[1] +np.sqrt(3)/2 *tip[0])]
+        ])
+        triangle.close()
+        triangle.set_fill_color((0.3, 0.6, 0.3))
+        triangle.set_stroke_color((1,0,0))   
 
+        self.render_vm(triangle)
     def render_text(self, text_obj) :
         ctx = self.ctx
         ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
@@ -96,6 +128,16 @@ class Renderer:
         x, y = text_obj.position 
         ctx.move_to(x, y)
         ctx.show_text(text_obj.text)
+    def render_frame(self):
+        buffer = self.im_surface.get_data()#getting the pixels of the image
+        frame = np.ndarray(shape=(self.height,self.width,4),dtype=np.uint8,buffer=buffer)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR) #convert cairo to opencv
+        self.video_writer.write(frame)  
+    def close_video(self):
+        if self.video_writer:
+            self.video_writer.release()
+            print("video saved succesfully")
+
 
 
 
@@ -203,4 +245,28 @@ def test_text() :
     surface.write_to_png("test_text_output.png")
     print('Saved to test_text_output.png')
 
-test_text()
+#test_text()
+WIDTH, HEIGHT, FPS = 640, 360, 30
+
+# Cairo setup
+surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, WIDTH, HEIGHT)
+ctx = cairo.Context(surface)
+
+# Create renderer with video recording
+renderer = Renderer(surface, ctx, FPS,WIDTH, HEIGHT, file_name="output.mp4")
+arr = mbj.Arrow2d(tip = np.array((100,0)),offset=np.array((WIDTH/2,HEIGHT/2)))
+# Draw frames
+for frame in range(60):
+    ctx.set_source_rgb(0, 0, 0)  # background
+    ctx.paint()
+
+    #ctx.set_source_rgb(1, 0, 0)  # red circle
+    #ctx.arc(320, 180, 50 + frame, 0, 2 * np.pi)
+    renderer.render_arrow2d(arr)
+    arr.tip = np.array((arr.tip[0]*np.cos(np.pi/30) - arr.tip[1]*np.sin(np.pi/30),
+                       arr.tip[1]*np.cos(np.pi/30) + arr.tip[0]*np.sin(np.pi/30) ))
+    #ctx.fill()
+
+    renderer.render_frame()
+
+renderer.close_video()
