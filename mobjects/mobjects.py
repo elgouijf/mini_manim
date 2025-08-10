@@ -121,10 +121,24 @@ class Mobject:
         if update_func in self.updaters:
             self.updaters.remove(update_func)
 
-    def run_updates(self, dt):
+    def run_updates(self, *args, **kwargs):
+        """ Runs all the updaters in the order they were added
+        """        
         for updater in self.updaters:
-            updater(self, dt)
-            
+            signature = inspect.signature(updater)
+            bound_args = {}
+            # Always pass self as the first argument
+            bound_args['mobj'] = self
+            for name, param in signature.parameters.items():
+                if name == 'mobj':
+                    continue
+                if name in kwargs:
+                    bound_args[name] = kwargs[name]
+                elif param.default is not param.empty:
+                    bound_args[name] = param.default
+                # else: leave missing, will raise error if required
+            updater(**bound_args)
+        self.apply_transform() # apply the transformation after all updaters have been run
 
 class Group(Mobject):
     def __init__(self, *mobjects):
