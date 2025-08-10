@@ -2,12 +2,16 @@ import mobjects.mobjects as mbj
 from ..utilities.rate_functions import *
 
 class Animation :
-    def __init__(self, mobject, rate_time = 1.0, rate_function = smooth):
+    def __init__(self, mobject, start_time, end_time, rate_function = smooth):
         mobject.apply_transform()  # clear out any pending transforms
         self.mobject = mobject
-        self.time = rate_time
         self.rate = rate_function
-        self.starting_mobject = self.mobject.copy()
+        self.start_time = start_time
+        self.end_time = end_time
+        self.duration = end_time - start_time
+        self.finished = False
+        self.starting_mobject = mobject.copy()  # make a copy to let the mobject move freely as it is used in here
+        
         
 
 class Transform(Animation):
