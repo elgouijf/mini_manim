@@ -140,9 +140,10 @@ class Mobject:
             updater(**bound_args)
         self.apply_transform() # apply the transformation after all updaters have been run
 
+
 class Group(Mobject):
-    def __init__(self, *mobjects):
-        super().__init__() # Group being a subclass of Mobject it'll have the same attributes intialzation
+    def __init__(self, *mobjects, **settings):
+        super().__init__(**settings) # Group being a subclass of Mobject it'll have the same attributes intialzation
         self.submobjects = list(mobjects)
 
     def add_objs(self, *mobjects):
@@ -158,7 +159,62 @@ class Group(Mobject):
         # get the group's center
         points = np.vstack([mobj.points for mobj in self.submobjects])
         return np.mean(points, axis=0)
+    
+    def refresh_points(self):
+        """ Refreshes the points of the group by combining the points of all submobjects """
+        if self.is_empty(self):
+            self.points = np.zeros((0, 2))
+        else:
+            self.points = np.vstack([mobj.points for mobj in self.submobjects])
 
+    def move_to(self, x, y):
+        for mobj in self.submobjects:
+            mobj.move_to(x, y)
+        self.refresh_points()  # Refresh points after moving
+
+    def scale(self, s):
+        for mobj in self.submobjects:
+            mobj.scale(s)
+        self.refresh_points()   
+
+    def rotate(self, theta):
+        for mobj in self.submobjects:
+            mobj.rotate(theta)
+        self.refresh_points()
+
+    def set_opacity(self, opacity):
+        for mobj in self.submobjects:
+            mobj.set_opacity(opacity)
+
+    def set_fill_color(self, color):
+        for mobj in self.submobjects:
+            mobj.set_fill_color(color)
+    
+    def set_stroke_color(self, color):
+        for mobj in self.submobjects:
+            mobj.set_stroke_color(color)
+
+    def add_updater(self, update_func):
+        """ Adds an updater to all submobjects in the group """
+        for mobj in self.submobjects:
+            mobj.add_updater(update_func)
+    
+    def remove_updater(self, update_func):
+        """ Removes an updater from all submobjects in the group """
+        for mobj in self.submobjects:
+            if update_func in mobj.updaters:
+                mobj.remove_updater(update_func)
+
+    def run_updates(self, *args, **kwargs):
+        """ Runs all the updaters in the order they were added for all submobjects """
+        for mobj in self.submobjects:
+            mobj.run_updates(*args, **kwargs)
+        self.refresh_points()
+
+    def is_empty(self):
+        """ Checks if the group has no submobjects """
+        return len(self.submobjects) == 0
+        
     def apply_transform(self):
         for mobj in self.submobjects:
             mobj.transform_matrix = self.transform_matrix @ mobj.transform_matrix
@@ -193,6 +249,64 @@ class VMobject(Mobject):
         self.subpaths.append(np.array(points))
         self.closed_subpaths.append(closed)
 
+    def get_subpaths(self):
+        """ Returns the subpaths of the VMobject """
+        return self.subpaths, self.closed_subpaths 
+
+
+class VGroup(VMobject):
+    def __init__(self, *vmobjects, **settings):
+        super().__init__(**settings) # VGroup being a subclass of VMobject it'll have the same attributes intialzation
+        self.submobjects = list(vmobjects)
+
+    def add_vobjs(self, *vmobjects):
+        """ Adds VMobjects to the group """
+        if not all(isinstance(vmobj, VMobject) for vmobj in vmobjects):
+            raise TypeError("All objects must be instances of VMobject or its subclasses.")
+        self.submobjects.extend(vmobjects)
+
+    def remove(self, vmobject):
+        try:
+            self.submobjects.remove(vmobject)
+        except ValueError:
+            print(f"Warning: {vmobject} is not a part of {self.name}")
+
+    def get_center(self):
+        # get the group's center
+        points = np.vstack([vmobj.points for vmobj in self.submobjects])
+        return np.mean(points, axis=0) 
+    
+    def refresh_points(self): 
+        """ Refreshes the points of the group by combining the points of all submobjects """
+        if self.submobjects:
+            self.points = np.vstack([vmobj.points for vmobj in self.submobjects])
+        else:
+            self.points = np.zeros((0, 2))
+    
+
+    def move_to(self, x, y):
+        for vmobj in self.submobjects:
+            vmobj.move_to(x, y)
+        self.refresh_points()
+    
+    def scale(self, s):
+        for vmobj in self.submobjects:
+            vmobj.scale(s)
+        self.refresh_points()   
+    
+    def rotate(self, theta):
+        for vmobj in self.submobjects:
+            vmobj.rotate(theta)
+        self.refresh_points()
+
+    def apply_transform(self):
+        for vmobj in self.submobjects:
+            vmobj.transform_matrix = self.transform_matrix @ vmobj.transform_matrix
+            vmobj.apply_transform()
+        # reset transform matrix
+        self.transform_matrix = np.identity(3)
+                 
+            
 
 class Line(VMobject):
     """
