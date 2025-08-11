@@ -13,6 +13,8 @@ class Mobject:
         self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
         self.fill_color = settings.get("fill_color", DEFAULT_FILL_COLOR)
         self.opacity = settings.get("fill_opacity", DEFAULT_FILL_OPACITY)
+        self.stroke_opacity = settings.get("stroke_opacity", DEFAULT_STROKE_OPACITY)
+        self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
         self.transform_matrix = np.identity(3) # we'll be using homogenous coordinates
 
         self.submobjects = [] # object starts with no children
@@ -108,8 +110,15 @@ class Mobject:
         self.fill_color = color
 
 
-    def set_stroke_color(self, color):
-        self.stroke_color = color
+    def set_stroke(self, color=None, width=None, opacity=None):
+        """Set the stroke (outline) style of the shape."""
+        if color is not None:
+            self.stroke_color = color
+        if width is not None:
+            self.stroke_width = width
+        if opacity is not None:
+            self.stroke_opacity = opacity
+        return self
     
     def set_points(self, points):
         self.points = points.copy()
@@ -121,7 +130,7 @@ class Mobject:
         if update_func in self.updaters:
             self.updaters.remove(update_func)
 
-    def run_updates(self, *args, **kwargs):
+    def run_updates(self, **kwargs):
         """ Runs all the updaters in the order they were added
         """        
         for updater in self.updaters:
@@ -145,6 +154,7 @@ class Group(Mobject):
     def __init__(self, *mobjects, **settings):
         super().__init__(**settings) # Group being a subclass of Mobject it'll have the same attributes intialzation
         self.submobjects = list(mobjects)
+        self.refresh_points()  # Refresh points after adding mobjects
 
     def add_objs(self, *mobjects):
         self.submobjects.extend(mobjects)
@@ -170,17 +180,17 @@ class Group(Mobject):
     def move_to(self, x, y):
         for mobj in self.submobjects:
             mobj.move_to(x, y)
-        self.refresh_points()  # Refresh points after moving
+        
 
     def scale(self, s):
         for mobj in self.submobjects:
             mobj.scale(s)
-        self.refresh_points()   
+
 
     def rotate(self, theta):
         for mobj in self.submobjects:
             mobj.rotate(theta)
-        self.refresh_points()
+
 
     def set_opacity(self, opacity):
         for mobj in self.submobjects:
@@ -219,6 +229,8 @@ class Group(Mobject):
         for mobj in self.submobjects:
             mobj.transform_matrix = self.transform_matrix @ mobj.transform_matrix
             mobj.apply_transofrm()
+        # Refresh points after applying transformations
+        self.refresh_points()  
         # reset transform matrix
         self.transform_matrix = np.identity(3)
 
@@ -252,61 +264,111 @@ class VMobject(Mobject):
     def get_subpaths(self):
         """ Returns the subpaths of the VMobject """
         return self.subpaths, self.closed_subpaths 
-
-
-class VGroup(VMobject):
-    def __init__(self, *vmobjects, **settings):
-        super().__init__(**settings) # VGroup being a subclass of VMobject it'll have the same attributes intialzation
-        self.submobjects = list(vmobjects)
-
-    def add_vobjs(self, *vmobjects):
-        """ Adds VMobjects to the group """
-        if not all(isinstance(vmobj, VMobject) for vmobj in vmobjects):
-            raise TypeError("All objects must be instances of VMobject or its subclasses.")
-        self.submobjects.extend(vmobjects)
-
-    def remove(self, vmobject):
-        try:
-            self.submobjects.remove(vmobject)
-        except ValueError:
-            print(f"Warning: {vmobject} is not a part of {self.name}")
-
-    def get_center(self):
-        # get the group's center
-        points = np.vstack([vmobj.points for vmobj in self.submobjects])
-        return np.mean(points, axis=0) 
     
-    def refresh_points(self): 
-        """ Refreshes the points of the group by combining the points of all submobjects """
-        if self.submobjects:
-            self.points = np.vstack([vmobj.points for vmobj in self.submobjects])
-        else:
-            self.points = np.zeros((0, 2))
-    
-
-    def move_to(self, x, y):
-        for vmobj in self.submobjects:
-            vmobj.move_to(x, y)
-        self.refresh_points()
-    
-    def scale(self, s):
-        for vmobj in self.submobjects:
-            vmobj.scale(s)
-        self.refresh_points()   
-    
-    def rotate(self, theta):
-        for vmobj in self.submobjects:
-            vmobj.rotate(theta)
-        self.refresh_points()
 
     def apply_transform(self):
-        for vmobj in self.submobjects:
-            vmobj.transform_matrix = self.transform_matrix @ vmobj.transform_matrix
-            vmobj.apply_transform()
-        # reset transform matrix
+        """ Applies the transformation matrix to the points of the VMobject """
+        # Convert points to homogenous coordinates
+        n_rows = self.points.shape[0] # points is of shape (N,2)
+        homogenous_surplus = np.ones((n_rows,1))
+        points_homogenous = np.hstack([self.points, homogenous_surplus]) # points_homogenous is of shape (N,3)
+        tarsnformed_points_homogenous = (self.transform_matrix @ points_homogenous.T).T
+        self.points = tarsnformed_points_homogenous[:, :2]
+
+        # Update subpaths
+        for i in range(len(self.subpaths)):
+            subpath = self.subpaths[i]
+            n_rows = subpath.shape[0]
+            homogenous_surplus = np.ones((n_rows, 1))
+            subpath_homogenous = np.hstack([subpath, homogenous_surplus])
+            transformed_subpath_homogenous = (self.transform_matrix @ subpath_homogenous.T).T
+            self.subpaths[i] = transformed_subpath_homogenous[:, :2]
+        # reset transform_matrix
         self.transform_matrix = np.identity(3)
-                 
-            
+
+
+
+class VGroup(Group, VMobject): # Group must come first for methods to follow MRO (Method Resolution Order)
+    def __init__(self, *vmobjects, **settings):
+        Group.__init__(self, *vmobjects, **settings) # initialize the group part
+        VMobject.__init__(self, **settings) # initialize the VMobject part
+        self.refresh_points()  # Refresh points after adding mobjects
+    
+    def close(self):
+        self.closed = True
+
+    def open(self):
+        self.closed = False
+    
+    def refresh_subpaths(self):
+        """ Refreshes the subpaths of the VGroup by combining the subpaths of all submobjects """
+        self.subpaths = []
+        self.closed_subpaths = []
+        for mobj in self.submobjects:
+            subpaths, closed_subpaths = mobj.get_subpaths()
+            self.subpaths.extend(subpaths)
+            self.closed_subpaths.extend(closed_subpaths)
+
+    def run_updates(self, *args, **kwargs):
+        """ Runs all the updaters in the order they were added for all submobjects """
+        for vmobj in self.submobjects:
+            vmobj.run_updates(*args, **kwargs)
+        self.refresh_points()
+        self.refresh_subpaths()  # Refresh subpaths after running updates
+
+    def apply_transform(self):
+        """ Applies the transformation matrix to the points of the VGroup """
+        for vmobject in self.submobjects:
+            vmobject.transform_matrix = self.transform_matrix @ vmobject.transform_matrix
+            vmobject.apply_transform()  # Apply the transformation to the VMobject part
+        # reset group's transform matrix after all submobjects are updated
+        self.transform_matrix = np.identity(3)
+        self.refresh_points()
+        self.refresh_subpaths()
+
+
+
+class Point(Mobject):
+    def __init__(self, artificial_width = 1e-5, artificial_height = 1e-5, position = np.array([0,0]), **settings):
+        super().__init__(**settings)
+        self.artificial_width = artificial_width
+        self.artificial_height = artificial_height
+        self.set_position(position)
+
+    def set_position(self, position):
+        """ Sets the position of the point """
+        self.set_points(np.array([position]))
+
+
+class Dot(Point):
+    def __init__(self, radius = 0.1, artificial_width = 1e-5, artificial_height = 1e-5, position = np.array([0,0]), **settings):
+        super().__init__(artificial_width, artificial_height, position, **settings)
+        self.radius = radius
+        self.generate_dot()
+
+    def generate_dot(self):
+        """ Generates the dot by creating a circle with the given radius """
+        circle = Circle(radius=self.radius, center=self.points[0]) # n_segments will be at default since a Dot is small enough for it to work
+        self.set_points(circle.points)  # Set the points of the dot to the points of the circle
+        
+class GlowingDot(Dot, VGroup):
+    def __init__(self, radius = 0.1, position = np.array([0,0]), glow_radius = 0.2, **settings):
+        super().__init__(radius=radius, position=position, **settings)
+        self.glow_radius = glow_radius
+        self.generate_glowing_dot()
+
+    def generate_glowing_dot(self):
+        """ Generates the glowing dot by creating a circle with the given glow radius """
+        glow_extend = self.glow_radius - self.radius
+        glow_layers = max(1, int(glow_extend*10))  # Number of layers to create a glow effect
+
+        for i in reversed(range(glow_layers)): # Create a series of circles to simulate a glow effect
+            circle = Circle(radius=self.radius + (i/glow_layers)*glow_extend, center=self.points[0])
+            circle.set_fill_color(self.fill_color)
+            circle.set_stroke(width= 0, opacity= 0)
+            circle.set_opacity(self.opacity * (1 - i / glow_layers))  # Fade out the glow effect
+            self.add_objs(circle)  # Add the circle to the group of glowing dots   
+
 
 class Line(VMobject):
     """
@@ -389,6 +451,7 @@ class Line(VMobject):
                 if dy/dx != a:
                     return False
         return True
+    
 class Vector2D(VMobject):
     def __init__(self,tip,offset = np.array([0,0])):
         #tip is coordinates o the vector with origin (0,0)
