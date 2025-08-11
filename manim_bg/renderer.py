@@ -10,6 +10,7 @@ import mobjects.mobjects as mbj
 import numpy as np
 
 import cv2
+import subprocess
 
 WIDTH = 480
 HEIGHT = 360
@@ -17,7 +18,7 @@ HEIGHT = 360
 
 class Renderer:
     #object to draw
-    def __init__(self,im_surface,ctx,fps = 10,width =WIDTH,height = HEIGHT,file_name = None):
+    def __init__(self,im_surface,ctx,fps = 10,width =WIDTH,height = HEIGHT,file_name = None,ffmpeg_flag = False):
         self.im_surface = im_surface
         self.ctx = ctx
         self.fps = fps
@@ -25,13 +26,30 @@ class Renderer:
         self.height = height
         self.file_name= file_name
         if file_name:
-            self.video_writer = cv2.VideoWriter(
-                file_name,
-                cv2.VideoWriter_fourcc(*'mp4v'),
-                fps,
-                (width,height)
-            )
-    def render_polygone(self,mobject):
+            if not ffmpeg_flag:
+                self.video_writer = cv2.VideoWriter(
+                    file_name,
+                    cv2.VideoWriter_fourcc(*'mp4v'),
+                    fps,
+                    (width,height)
+                )
+            else:
+                self.ffmpeg_cmd = [
+                    'ffmpeg',
+                    '-y',  # overwrite output
+                    '-f', 'rawvideo',
+                    '-vcodec', 'rawvideo',
+                    '-pix_fmt', 'bgr24',  # or 'rgb24' depending on your array
+                    '-s', f'{width}x{height}',
+                    '-r', str(fps),
+                    '-i', '-',  # input from stdin
+                    '-an',  # no audio
+                    '-vcodec', 'libx264',
+                    '-pix_fmt', 'yuv420p',
+                    'output.mp4'
+                ]
+                            
+    def render_polygone(self,mobject ):
         if mobject.points.shape[0] == 0:
             return#no points to draw
         #drawing succesion of points
@@ -62,7 +80,11 @@ class Renderer:
                     if not i:
                         self.ctx.move_to(*points[0])
                     else:
+                        self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
+                                        vmobject.stroke_color[2],vmobject.opacity)
                         self.ctx.line_to(*points[i])
+                        self.ctx.set_line_width(2)
+                        self.ctx.stroke()
                 if vmobject.close:
                     self.ctx.line_to(*points[0])
                 
@@ -70,8 +92,9 @@ class Renderer:
                     self.ctx.set_source_rgb(vmobject.fill_color[0],vmobject.fill_color[1],
                                     vmobject.fill_color[2])#fill_color
                     self.ctx.fill_preserve()#fill but keep the path
-                    self.ctx.set_source_rgb(vmobject.stroke_color[0],vmobject.stroke_color[1],
-                                    vmobject.stroke_color[2])
+                    self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
+                                    vmobject.stroke_color[2],vmobject.opacity)
+                    self.ctx.paint()
                     self.ctx.set_line_width(2)
                     self.ctx.stroke()
             else:
@@ -84,7 +107,11 @@ class Renderer:
                         if not j:
                             self.ctx.move_to(*points[0])
                         else:
+                            self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
+                                        vmobject.stroke_color[2],vmobject.opacity)
                             self.ctx.line_to(*points[j])
+                            self.ctx.set_line_width(2)
+                            self.ctx.stroke()
                     if vmobject.closed_subpaths[i]:
                         self.ctx.line_to(*points[0])
                     
@@ -92,8 +119,9 @@ class Renderer:
                         self.ctx.set_source_rgb(vmobject.fill_color[0],vmobject.fill_color[1],
                                         vmobject.fill_color[2])#fill_color
                         self.ctx.fill_preserve()#fill but keep the path
-                        self.ctx.set_source_rgb(vmobject.stroke_color[0],vmobject.stroke_color[1],
-                                        vmobject.stroke_color[2])
+                        self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
+                                        vmobject.stroke_color[2],vmobject.opacity)
+                        self.ctx.paint()
                         self.ctx.set_line_width(2)
                         self.ctx.stroke()
         else:
@@ -110,13 +138,13 @@ class Renderer:
         triangle = mbj.VMobject()
         triangle.points = np.array([
             [end_point[0]+0.1*tip[0],end_point[1] + 0.1*tip[1]],
-            [end_point[0] + 0.1*(1/2 *tip[0]  + np.sqrt(3)/2 *tip[1]),
-             end_point[1] + 0.1*(1/2 * tip[1] -np.sqrt(3)/2 *tip[0])],
-            [end_point[0] + 0.1*(1/2 *tip[0]  - np.sqrt(3)/2 *tip[1]),
-             end_point[1] + 0.1*(1/2 * tip[1] +np.sqrt(3)/2 *tip[0])]
+            [end_point[0] + (0.01)*(1/2 *tip[0]  + np.sqrt(3)/2 *tip[1]),
+             end_point[1] + 0.01*(1/2 * tip[1] -np.sqrt(3)/2 *tip[0])],
+            [end_point[0] + 0.01*(1/2 *tip[0]  - np.sqrt(3)/2 *tip[1]),
+             end_point[1] + 0.01*(1/2 * tip[1] +np.sqrt(3)/2 *tip[0])]
         ])
         triangle.close()
-        triangle.set_fill_color((0.3, 0.6, 0.3))
+        triangle.set_fill_color((1, 0, 0))
         triangle.set_stroke_color((1,0,0))   
 
         self.render_vm(triangle)
@@ -128,10 +156,13 @@ class Renderer:
         x, y = text_obj.position 
         ctx.move_to(x, y)
         ctx.show_text(text_obj.text)
-    def render_frame(self):
+    def render_frame(self,frame_index,out_name,main_save = True):
         buffer = self.im_surface.get_data()#getting the pixels of the image
         frame = np.ndarray(shape=(self.height,self.width,4),dtype=np.uint8,buffer=buffer)
         frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR) #convert cairo to opencv
+        if main_save:
+            cv2.imwrite(f"{out_name}/frame_{frame_index}.png",frame)
+
         self.video_writer.write(frame)  
     def close_video(self):
         if self.video_writer:
@@ -212,7 +243,7 @@ def test_vmobject_open_and_closed():
     ])
     closed_vm.fill_color = (0.3, 0.6, 0.3)
     closed_vm.stroke_color = (0, 0, 0)
-    closed_vm.close = True
+    closed_vm.close()
 
     # Create an open shape
     open_vm = mbj.VMobject()
@@ -223,7 +254,7 @@ def test_vmobject_open_and_closed():
     ])
     open_vm.fill_color = (0.8, 0.2, 0.2)
     open_vm.stroke_color = (0, 0, 0)
-    open_vm.close = False
+    open_vm.open()
 
     # Render both
     renderer.render_vm(closed_vm)
@@ -263,6 +294,9 @@ for frame in range(60):
     #ctx.set_source_rgb(1, 0, 0)  # red circle
     #ctx.arc(320, 180, 50 + frame, 0, 2 * np.pi)
     renderer.render_arrow2d(arr)
+
+    renderer.render_arrow2d(mbj.Arrow2d.x_axis(0,0.9*WIDTH,HEIGHT/2))
+    renderer.render_arrow2d(mbj.Arrow2d.y_axis(0,0.9*HEIGHT,WIDTH/2))       
     arr.tip = np.array((arr.tip[0]*np.cos(np.pi/30) - arr.tip[1]*np.sin(np.pi/30),
                        arr.tip[1]*np.cos(np.pi/30) + arr.tip[0]*np.sin(np.pi/30) ))
     #ctx.fill()
