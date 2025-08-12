@@ -418,17 +418,17 @@ class Line(VMobject):
         #line equation goes y = tangent*x + (y0 - tangent*x0)
             if a*x_lim_right + b< y_lim_down:
                 #line will pass by top
-                self.end_pt = np.array([(y_lim_down-b)/a,y_lim_down])
+                self.end_pt = np.array([(y_lim_down-b) / a,y_lim_down])
 
             else:
-                self.end_pt = np.array([x_lim_right,a*x_lim_right + b]) 
+                self.end_pt = np.array([x_lim_right,a * x_lim_right + b]) 
 
             if a*x_lim_left + b > y_lim_up:
                 #line will pass by top
-                self.start_pt = np.array([(y_lim_up-b)/a,y_lim_up])
+                self.start_pt = np.array([(y_lim_up-b) / a,y_lim_up])
 
             else:
-               self.start_pt = np.array([x_lim_left,a*x_lim_left + b])
+               self.start_pt = np.array([x_lim_left,a * x_lim_left + b])
 
         else : 
             self.start_pt = np.array([x_lim_left,b])
