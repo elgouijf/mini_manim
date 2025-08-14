@@ -168,7 +168,31 @@ class Renderer:
         if self.video_writer:
             self.video_writer.release()
             print("video saved succesfully")
-
+    def render_text(self,text_obj:mbj.VMobject):
+        """
+        Render text object using Cairo
+        """
+        if self.opacity is not None and self.opacity < 1.0:
+           
+            ctx = self.ctx
+            ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            ctx.set_font_size(text_obj.font_size)
+            ctx.set_source_rgba(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2], text_obj.opacity)
+            x, y = text_obj.position 
+            extents = ctx.font_extents()
+            y = y + extents.ascent  # Adjust y position for baseline
+            ctx.move_to(x, y)
+            ctx.show_text(text_obj.text)
+        else:
+            ctx = self.ctx
+            ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            ctx.set_font_size(text_obj.font_size)
+            ctx.set_source_rgb(*text_obj.f)
+            x, y = text_obj.position 
+            extents = ctx.font_extents()
+            y = y + extents.acscent # Adjust y position for baseline
+            ctx.move_to(x, y)
+            ctx.show_text(text_obj.text)
 
 
 

@@ -666,7 +666,8 @@ class Text(Mobject) :
         # call the __init__ method of the Mobject class (superclass)
         super().__init__()      
         self.text = text            # a string : the text we want to show
-        self.position = position    # the coordinates of the starting position of the text
+        self.position = position    # the coordinates of the top left corner of the text
         self.font = font            
         self.font_size = font_size
         self.text_color = color     # a triplet (r,g,b)
+        self.opacity = 1.0             # opacity of the text
