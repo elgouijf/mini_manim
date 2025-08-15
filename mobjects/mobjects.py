@@ -2,6 +2,7 @@ import numpy as np
 from config import *
 from math import cos, sin, tan, pi
 from utilities.bezier import *
+import cairo
 import inspect
 
 class Mobject:
@@ -671,6 +672,7 @@ class Text(VMobject) :
         self.font_size = font_size
         self.text_color = color     # a triplet (r,g,b)
         self.opacity = 1.0             # opacity of the text
+
     def generate_points(self):
         """ Generates the points of the text using the context's text_path method """
         ctx = self.ctx
@@ -687,6 +689,7 @@ class Text(VMobject) :
         sub_paths = []
         curr_subpath = []
         prev_point = None
+
         for type,coords in path_data:
             if type == cairo.PATH_MOVE_TO :#if there is an existingb subpath
                 if curr_subpath:
@@ -695,9 +698,11 @@ class Text(VMobject) :
                     curr_subpath = []
                 prev_point = np.array(coords)
                 curr_subpath.append(np.array(coords))
+
             elif type == cairo.PATH_LINE_TO:
                 prev_point = np.array(coords)
                 curr_subpath.append(np.array(coords))
+
             elif type == cairo.PATH_CURVE_TO:
                 # Bezier curve points are in groups of 3
                 p0 = prev_point
@@ -707,12 +712,14 @@ class Text(VMobject) :
                 bezier_points = bezier_cubic(np.linspace(0, 1, 10), p0, p1, p2, p3)
                 curr_subpath.extend(bezier_points)
                 prev_point = p3
+
             elif type == cairo.PATH_CLOSE_PATH:
                 #close adn save subpath
                 if curr_subpath:
                     sub_paths.append(np.array(curr_subpath))
                     curr_subpath = []
                 prev_point = None
+                
         if curr_subpath:
             sub_paths.append(np.array(curr_subpath))
         self.subpaths = sub_paths

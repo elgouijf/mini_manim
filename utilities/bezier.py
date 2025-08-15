@@ -79,6 +79,90 @@ def bezier_quadratic(t, p0, p1, p2):
     """
     return ((((1 - t)**2) * p0 )+ (2 * (1 - t) * t * p1) + (t**2) * p2)
 
+def curvature_scalar(prime, second):
+    """
+    Compute the curvature of a line segment defined by two points p0 and p1.
+    
+    Parameters:
+    - p0: First point (numpy array).
+    - p1: Second point (numpy array).
+    - accurate: If True, uses a more accurate method for curvature calculation.
+    
+    Returns:
+    - Curvature value as a float.
+    """
+    """ cross1 = np.cross(prime_f0, second_f0)
+    cross2 = np.cross(prime_f1, second_f1)
+    curvature1 = np.linalg.norm(cross1) / (np.linalg.norm(prime_f0)**3)
+    curvature2 = np.linalg.norm(cross2) / (np.linalg.norm(prime_f1)**3)
+    return (curvature1 + curvature2) / 2 """
+
+    curvature1 = np.abs(second) / (1 + prime**2)**(3/2)
+    return curvature1 
+    
+
+def unit(vector):
+    """
+    Normalize a vector to unit length.
+    """
+    norm = np.linalg.norm(vector)
+    if norm == 0:
+        return vector
+    return vector / norm
+
+def control_points(func, p0, p3, error_on_curvature=0.001):
+    """
+    Calculate control points for a cubic Bézier curve that approximates
+    a given function y = f(x) between p0 and p3.
+
+    Parameters:
+    - func: function f(x)
+    - p0, p3: start and end points as (x, y)
+    - error_on_curvature: curvature threshold for linear approximation
+
+    Returns:
+    - p1, p2: control points
+    """
+    dt = 1e-5
+    p0 = np.asarray(p0, dtype=float)
+    p3 = np.asarray(p3, dtype=float)
+
+    x0, x1 = p0[0], p3[0]
+
+    # First derivatives
+    prime_f0 = (func(x0 + dt) - func(x0 - dt)) / (2 * dt)
+    prime_f1 = (func(x1 + dt) - func(x1 - dt)) / (2 * dt)
+
+    # Second derivatives
+    second_f0 = (func(x0 + dt) - 2 * func(x0) + func(x0 - dt)) / (dt**2)
+    second_f1 = (func(x1 + dt) - 2 * func(x1) + func(x1 - dt)) / (dt**2)
+
+    # Tangent unit vectors
+    T0 = unit(np.array([1.0, prime_f0], dtype=float))
+    T1 = unit(np.array([1.0, prime_f1], dtype=float))
+
+    # Average curvature at endpoints
+    kappa_avg = 0.5 * (
+        curvature_scalar(prime_f0, second_f0) +
+        curvature_scalar(prime_f1, second_f1)
+    )
+
+    # Control point distance along tangents
+    if kappa_avg <= error_on_curvature:
+        # Nearly straight: 1/3 of chord length
+        dist = np.linalg.norm(p3 - p0) / 3.0
+    else:
+        R = 1.0 / kappa_avg  # radius of curvature
+        cos_theta = np.clip(np.dot(T0, T1), -1.0, 1.0)
+        theta = np.arccos(cos_theta)
+        dist = (4 * R * np.tan(theta / 4.0)) / 3.0
+
+    # Control points
+    p1 = p0 + T0 * dist
+    p2 = p3 - T1 * dist  # minus so it points toward p0
+
+    return p1, p2
+
 
 def lagrange(x, points):
     """
