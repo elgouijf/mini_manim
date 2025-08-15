@@ -490,6 +490,16 @@ class Line(VMobject):
                     return False
         return True
     
+    def grid(WIDTH, HEIGHT,n_lines_x,n_lines_y):
+        """ Returns a grid of lines with the given width and height """
+        lines = []
+        for x in np.linspace(0, WIDTH, n_lines_x):
+            lines.append(Line(np.array([x, 0]), np.array([x, HEIGHT])))
+        for y in np.linspace(0, HEIGHT, n_lines_y):
+            lines.append(Line(np.array([0, y]), np.array([WIDTH, y])))
+        return lines
+    
+    
 class Vector2D(VMobject):
     def __init__(self,tip,offset = np.array([0,0])):
         #tip is coordinates o the vector with origin (0,0)
@@ -534,6 +544,7 @@ class Arrow2d(Vector2D):
     @classmethod
     def x_axis(x_lim_left,x_lim_right,y_mid):
         return Vector2D(tip=np.array((x_lim_right - x_lim_left,y_mid)),offset=np.array((x_lim_left,0)))
+    @classmethod
     def y_axis(y_up,y_down,x_mid):
         return Vector2D(tip=np.array((0,y_up - y_down)),offset=np.array((x_mid,y_down)))
     def geometric_prop(self):
@@ -542,68 +553,6 @@ class Arrow2d(Vector2D):
     
 
 
-class Vector2D(VMobject):
-    def __init__(self,tip,offset = np.array([0,0])):
-        #tip is coordinates o the vector with origin (0,0)
-        super().__init__()
-        self.tip = tip
-        self.offset = offset
-    @property#getter ,don't assign
-
-    def x(self):
-        return self.tip[0]
-    @property
-
-    def y(self):
-        return self.tip[1]
-    
-    def norm2(self):
-        return np.sqrt(self.x**2 + self.y**2)
-    
-    def norm1(self):
-        return abs(self.x) + abs(self.y)
-    
-    def norm3(self):
-        return max(self.x,self.y)
-    
-    def angle(self):#between -pi (included) and pi
-        if self.x>0:
-            return np.atan(self.y/self.x)
-        
-        elif self.x<0 :
-            if self.y>0:
-                return np.atan(self.y/self.x) + np.pi
-            
-            else:
-                return np.atan(self.y/self.x) - np.pi
-            
-        else :#null cosine
-            if self.y>0:
-                return np.pi/2
-            
-            else:
-                return -np.pi/2
-    
-  
-    def dot_prod(self,other):
-        return self.x*other.x  + self.y*other.y
-    
-    def __mul__(self,other):
-        return  self.x*other.y  - self.y*other.x
-    
-    def __repr__(self):
-        return f"({self.x},{self.y})"
-    
-class Arrow2d(Vector2D):
-    def x_axis(x_lim_left,x_lim_right):
-        return Vector2D(tip=np.array((x_lim_right - x_lim_left,0)),offset=np.array((x_lim_left,0)))
-    
-    def y_axis(y_up,y_down):
-        return Vector2D(tip=np.array((0,y_up - y_down)),offset=np.array((0,y_down)))
-    
-    def geometric_prop(self):
-        line = Line(self.points[0],self.points[-1])
-        return line.tangent(),line.offset
     
 
 class Circle(VMobject):
