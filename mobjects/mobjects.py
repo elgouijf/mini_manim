@@ -2,8 +2,8 @@ import numpy as np
 from config import *
 from math import cos, sin, tan, pi
 from utilities.bezier import *
-import cairo
 import inspect
+import cairo
 
 class Mobject:
     def __init__(self, **settings):
@@ -370,6 +370,43 @@ class GlowingDot(Dot, VGroup):
             circle.set_opacity(self.opacity * (1 - i / glow_layers))  # Fade out the glow effect
             self.add_objs(circle)  # Add the circle to the group of glowing dots   
 
+class FunctionGraph(VMobject):
+    """
+    a class for dealing with function graphs
+    """
+
+    def __init__(self, func, x_lim_left, x_lim_right, closed = False, n_points = 100, n_bezier_points = 59, error = 0.01, **settings):
+        super().__init__(**settings)
+        self.func = func
+        self.x_lim_left = x_lim_left
+        self.x_lim_right = x_lim_right
+        self.n_points = n_points
+        self.error = error
+        self.closed = closed
+        self.generate_graph(n_bezier_points)
+
+                
+    
+
+    def generate_graph(self, n_bezier_points):
+
+        curve = []
+        x_values = np.linspace(self.x_lim_left, self.x_lim_right, self.n_points)
+        y_values = self.func(x_values)
+        points = np.column_stack((x_values, y_values))
+        n = len(x_values)
+        for i in range(n - 1):
+            p0 = points[i]
+            p3 = points[(i + 1)]
+            p1, p2 = control_points(self.func, p0, p3, self.error)
+
+            for t in np.linspace(0, 1, n_bezier_points):
+                point = bezier_cubic(t, p0, p1, p2, p3)
+                curve.append(point)
+
+        self.add_subpaths(curve, self.closed)
+                
+
 
 class Line(VMobject):
     """
@@ -661,7 +698,7 @@ class Polygon(VMobject):
         self.set_corners(corners)
 
 
-class Text(VMobject) :
+class Text(Mobject) :
     """" Text Class """
     def __init__(self, text, position, font, font_size, color) :
         # call the __init__ method of the Mobject class (superclass)
