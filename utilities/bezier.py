@@ -198,8 +198,13 @@ def control_points(func, p0, p3, error_on_curvature=0.001):
         dist = np.linalg.norm(p3 - p0) / 3.0
     else:
         R = 1.0 / kappa_avg  # radius of curvature
-        cos_theta = np.clip(np.dot(T0, T1), -1.0, 1.0)
-        theta = np.arccos(cos_theta)
+        cos_theta = np.clip(np.dot(T0, T1), -1.0, 1.0) # T0 and T1 are unit vectors, so dot product gives cos(theta), clip to avoid numerical overshooting
+        sin_theta = T0[0] * T1[1] - T0[1] * T1[0]  # sin(theta) = |T0 x T1|, where x is the cross product in 2D
+        if sin_theta < 0: # if sin(theta) is negative, we need to adjust theta
+            theta = -np.arccos(cos_theta)
+        else:
+            theta = np.arccos(cos_theta)
+        
         dist = (4 * R * np.tan(theta / 4.0)) / 3.0
 
     # Control points
