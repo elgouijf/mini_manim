@@ -79,6 +79,44 @@ def bezier_quadratic(t, p0, p1, p2):
     """
     return ((((1 - t)**2) * p0 )+ (2 * (1 - t) * t * p1) + (t**2) * p2)
 
+import numpy as np
+
+def arc_midpoint(f, x0, x1, n=1000):
+    """
+    Calculate the midpoint along a curve defined by a function f(x)
+    between x0 and x1, based on arc length.
+
+    Parameters:
+    - f: function f(x)
+    - x0, x1: interval endpoints
+    - n: number of points for numerical approximation
+
+    Returns:
+    - midpoint: tuple (x_mid, y_mid)
+    - total_length: total arc length of the curve
+    """
+    xs = np.linspace(x0, x1, n)
+    ys = f(xs)
+
+    # Small segment lengths
+    dx = np.diff(xs)
+    dy = np.diff(ys)
+    ds = np.sqrt(dx**2 + dy**2)
+
+    # Cumulative sum of lengths
+    cum_length = np.cumsum(ds)
+    cum_length = np.insert(cum_length, 0, 0)  # start from 0
+
+    total_length = cum_length[-1]
+
+    # Find the midpoint along the curve
+    mid_index = np.searchsorted(cum_length, total_length / 2)
+    x_mid = xs[mid_index]
+    y_mid = ys[mid_index]
+
+    return (x_mid, y_mid)
+
+
 def curvature_scalar(prime, second):
     """
     Compute the curvature of a line segment defined by two points p0 and p1.
@@ -128,24 +166,31 @@ def control_points(func, p0, p3, error_on_curvature=0.001):
     p3 = np.asarray(p3, dtype=float)
 
     x0, x1 = p0[0], p3[0]
+    dx = x1 - x0
+
+    midpoint = arc_midpoint(func, x0, x1)
+    x_mid, y_mid = midpoint
 
     # First derivatives
     prime_f0 = (func(x0 + dt) - func(x0 - dt)) / (2 * dt)
     prime_f1 = (func(x1 + dt) - func(x1 - dt)) / (2 * dt)
 
+    prime_fmid = (func(x_mid + dt) - func(x_mid - dt)) / (2 * dt)
+
     # Second derivatives
+
     second_f0 = (func(x0 + dt) - 2 * func(x0) + func(x0 - dt)) / (dt**2)
     second_f1 = (func(x1 + dt) - 2 * func(x1) + func(x1 - dt)) / (dt**2)
 
+    second_fmid = (func(x_mid + dt) - 2 * func(x_mid) + func(x_mid - dt)) / (dt**2)
+
     # Tangent unit vectors
-    T0 = unit(np.array([1.0, prime_f0], dtype=float))
-    T1 = unit(np.array([1.0, prime_f1], dtype=float))
+    T0 = unit(np.array([dx, dx*prime_f0], dtype=float))
+    T1 = unit(np.array([dx, dx*prime_f1], dtype=float))
 
     # Average curvature at endpoints
-    kappa_avg = 0.5 * (
-        curvature_scalar(prime_f0, second_f0) +
-        curvature_scalar(prime_f1, second_f1)
-    )
+    
+    kappa_avg = curvature_scalar(prime_fmid, second_fmid)
 
     # Control point distance along tangents
     if kappa_avg <= error_on_curvature:
