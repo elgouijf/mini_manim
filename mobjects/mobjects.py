@@ -428,7 +428,7 @@ class Line(VMobject):
             return np.inf
         
     def extend(self,x_lim_left,y_lim_down,x_lim_right,y_lim_up):
-        if self.tangent == np.inf:#vertical line
+        if self.tangent() == np.inf:#vertical line
             self.start_pt = np.array([self.start_pt[0],y_lim_down])
             self.end_pt = np.array([self.end_pt[0],y_lim_up])
             return
