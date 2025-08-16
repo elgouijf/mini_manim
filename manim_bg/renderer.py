@@ -145,7 +145,7 @@ class Renderer:
         ])
         triangle.close()
         triangle.set_fill_color((1, 0, 0))
-        triangle.set_stroke_color((1,0,0))   
+        triangle.stroke_color = (1,0,0) 
 
         self.render_vm(triangle)
     def render_text(self, text_obj) :
@@ -156,6 +156,15 @@ class Renderer:
         x, y = text_obj.position 
         ctx.move_to(x, y)
         ctx.show_text(text_obj.text)
+    def render_line(self,line : mbj.Line):
+        """
+        Render a line object using Cairo
+        """
+        self.ctx.move_to(*line.start_pt)
+        self.ctx.line_to(*line.end_pt)
+        self.ctx.set_source_rgb(line.stroke_color[0], line.stroke_color[1], line.stroke_color[2])
+        self.ctx.set_line_width(1)
+        self.ctx.stroke()
     def render_frame(self,frame_index,out_name,main_save = True):
         buffer = self.im_surface.get_data()#getting the pixels of the image
         frame = np.ndarray(shape=(self.height,self.width,4),dtype=np.uint8,buffer=buffer)
@@ -172,7 +181,7 @@ class Renderer:
         """
         Render text object using Cairo
         """
-        if self.opacity is not None and self.opacity < 1.0:
+        if text_obj.opacity is not None and text_obj.opacity < 1.0:
            
             ctx = self.ctx
             ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
@@ -180,17 +189,17 @@ class Renderer:
             ctx.set_source_rgba(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2], text_obj.opacity)
             x, y = text_obj.position 
             extents = ctx.font_extents()
-            y = y + extents.ascent  # Adjust y position for baseline
+            y = y + extents[0]  # Adjust y position for baseline
             ctx.move_to(x, y)
             ctx.show_text(text_obj.text)
         else:
             ctx = self.ctx
             ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
             ctx.set_font_size(text_obj.font_size)
-            ctx.set_source_rgb(*text_obj.f)
+            ctx.set_source_rgb(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2])
             x, y = text_obj.position 
             extents = ctx.font_extents()
-            y = y + extents.acscent # Adjust y position for baseline
+            y = y + extents[0] # Adjust y position for baseline
             ctx.move_to(x, y)
             ctx.show_text(text_obj.text)
 
@@ -319,12 +328,12 @@ for frame in range(60):
     #ctx.arc(320, 180, 50 + frame, 0, 2 * np.pi)
     renderer.render_arrow2d(arr)
 
-    renderer.render_arrow2d(mbj.Arrow2d.x_axis(0,0.9*WIDTH,HEIGHT/2))
-    renderer.render_arrow2d(mbj.Arrow2d.y_axis(0,0.9*HEIGHT,WIDTH/2))       
+    #renderer.render_arrow2d(mbj.Arrow2d.x_axis(0,0.9*WIDTH,HEIGHT/2))
+   # renderer.render_arrow2d(mbj.Arrow2d.y_axis(0,0.9*HEIGHT,WIDTH/2))       
     arr.tip = np.array((arr.tip[0]*np.cos(np.pi/30) - arr.tip[1]*np.sin(np.pi/30),
                        arr.tip[1]*np.cos(np.pi/30) + arr.tip[0]*np.sin(np.pi/30) ))
     #ctx.fill()
 
-    renderer.render_frame()
+    #renderer.render_frame()
 
-renderer.close_video()
+#renderer.close_video()

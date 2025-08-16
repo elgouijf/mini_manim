@@ -649,12 +649,12 @@ class Polygon(VMobject):
 
 class Text(Mobject) :
     """" Text Class """
-    def __init__(self, text, position, font, font_size, color) :
+    def __init__(self, text, position, font_size, color) :
         # call the __init__ method of the Mobject class (superclass)
         super().__init__()      
         self.text = text            # a string : the text we want to show
         self.position = position    # the coordinates of the top left corner of the text
-        self.font = font            
+        self.font = "Sans"  # default font       
         self.font_size = font_size
         self.text_color = color     # a triplet (r,g,b)
         self.opacity = 1.0             # opacity of the text

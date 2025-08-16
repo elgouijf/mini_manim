@@ -1,6 +1,7 @@
 import mobjects.mobjects as mbj
 import manim_bg.renderer as rdr
 import cairo
+from utilities.color import BLACK, WHITE,RED, GREEN, BLUE
 
 import numpy as np
 WIDTH, HEIGHT, FPS = 1920, 1080, 30
@@ -23,7 +24,8 @@ d = float(input("Enter d: "))
 # Create a transformation matrix
 starts = {line:line.start_pt for line in grid}
 ends = {line:line.end_pt for line in grid}
-
+rgb_RED = RED.get_rgb()
+Text = mbj.Text("Grid Animation of the matrix",position=(WIDTH/3,HEIGHT/10), color=rgb_RED, font_size=50)
 
 for frame in range(1000):
     # Clear the context
@@ -34,6 +36,7 @@ for frame in range(1000):
     
     for line in grid:
         renderer.render_line(line)
+        renderer.render_text(Text)
         
         # Apply transformation to each line
         matrix = np.array([[a*frame/1000 + (1-frame/1000)*1, b*frame/1000], [c*frame/1000, d*frame/1000 + (1-frame/1000)*1]])
