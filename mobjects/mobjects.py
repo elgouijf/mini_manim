@@ -4,15 +4,43 @@ from math import cos, sin, tan, pi
 from utilities.bezier import *
 import inspect
 import cairo
+from copy import deepcopy
+
+def resize_preserving_order(points, new_length):
+    """
+    Given an array of points, return a new array with exactly new_length points,
+    interpolated evenly along the original order.
+    """
+    old_length = len(points)
+    if old_length == 0:
+        return np.zeros((new_length, 2))
+    elif old_length == new_length:
+        return points.copy()
+
+    # Compute fractional indices to sample along the original points
+    idxs = np.linspace(0, old_length - 1, new_length)
+    new_points = []
+
+    for idx in idxs:
+        low = int(np.floor(idx))
+        high = int(np.ceil(idx))
+        t = idx - low
+        if high >= old_length:
+            high = old_length - 1
+        pt = (1 - t) * points[low] + t * points[high]
+        new_points.append(pt)
+    
+    return np.array(new_points)
+
 
 class Mobject:
     def __init__(self, **settings):
         # start with no poinst (i.e 0 rows)
         self.points = np.zeros((0,2))
 
-        self.stroke_color = settings.get("stroke_color", DEFAULT_STROKE_COLOR)
+        self.stroke_color = (settings.get("stroke_color", DEFAULT_STROKE_COLOR)).get_rgb()  # Convert color to RGB tuple
         self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
-        self.fill_color = settings.get("fill_color", DEFAULT_FILL_COLOR)
+        self.fill_color = (settings.get("fill_color", DEFAULT_FILL_COLOR)).get_rgb()  # Convert color to RGB tuple
         self.opacity = settings.get("fill_opacity", DEFAULT_FILL_OPACITY)
         self.stroke_opacity = settings.get("stroke_opacity", DEFAULT_STROKE_OPACITY)
         self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
@@ -122,7 +150,7 @@ class Mobject:
         return self
     
     def set_points(self, points):
-        self.points = points.copy()
+        self.points = deepcopy(points)  # Use deepcopy to ensure the points are not modified outside this class
 
     def add_updater(self, update_func): #functions are objects too (in C it would've been a callback function but it is simpler in python)
         self.updaters.append(update_func)
@@ -149,6 +177,22 @@ class Mobject:
                 # else: leave missing, will raise error if required
             updater(**bound_args)
         self.apply_transform() # apply the transformation after all updaters have been run
+
+    def resize_points(self, new_length, resize_func=resize_preserving_order):
+        """
+        Resize the points array to have exactly new_length points,
+        interpolated evenly along the original order.
+        """
+        self.points = resize_func(self.points, new_length)
+        
+    def align_points(self, mobject):
+        n1 = len(self.points)
+        n2 = len(mobject.points)
+        max_pts = max(n1, n2)
+        for mobj in (self, mobject):
+            mobj.resize_points(max_pts, resize_func=resize_preserving_order)
+        
+
 
 
 class Group(Mobject):
@@ -258,9 +302,16 @@ class VMobject(Mobject):
     def open(self):
         self.closed = False
 
-    def add_subpaths(self, points, closed = False):
-        self.subpaths.append(np.array(points))
+    def add_subpaths(self, points, closed=False):
+        points = np.array(points)
+        self.subpaths.append(points)
         self.closed_subpaths.append(closed)
+
+        # Flatten all subpaths into self.points for transforms/animations
+        if len(self.subpaths) > 0:
+            self.points = np.vstack(self.subpaths)
+        else:
+            self.points = np.zeros((0, 2))
 
     def get_subpaths(self):
         """ Returns the subpaths of the VMobject """
@@ -556,65 +607,55 @@ class Arrow2d(Vector2D):
     
 
 class Circle(VMobject):
-
-    def __init__(self, n_segments = 4, center = np.array([0,0]), radius = 1.0, n_bezier_points = 59, **settings):
-        super().__init__(**settings) # this will take care of all settings
-        self.radius = radius
-        self.close()
-        if n_segments % 4 != 0:
-            raise ValueError("n_segment must be a multiple of 4 (4 included)")
-        elif n_segments:
-            self.n_segments = n_segments #setting the number of points the circle is made of
-        self.generate_circle(center, n_bezier_points)
-
-    
+    def __init__(self, n_segments=4, center=np.array([0.0, 0.0]), radius=1.0, n_bezier_points=60, **settings):
+        super().__init__(**settings)
+        self.radius = float(radius)
+        self.center = np.array(center, dtype=np.float64)
         
-    def generate_circle(self, center, n_bezier_points):
+        if n_segments % 4 != 0:
+            raise ValueError("n_segments must be a multiple of 4")
+        self.n_segments = n_segments
+        self.generate_circle(n_bezier_points)
+
+    def generate_circle(self, n_bezier_points):
         radius = self.radius
         n_segments = self.n_segments
-        theta = (2*pi)/n_segments
+        theta = 2 * np.pi / n_segments
+        # kappa formula for circular arc approximation
+        kappa = (4/3) * np.tan(theta / 4)
 
-        if n_segments == 4:
-            kappa = 0.5522847498 # this is (4*radius*tan((pi/2)/4))/3
-        elif theta < pi/12 :
-            # for a small theta we can go to the first order of tan and still maintain a good quality
-            kappa = (radius*theta) / 3
-        else:
-            # we use the midpoint method/ cross product to determine a good estimation for kappa
-            kappa = (4*radius*tan(theta/4))/3
-
-        
-        circle = []
+        points = []
         for i in range(n_segments):
-            start_angle = theta*i
-            end_angle = theta*(i + 1)
+            start_angle = i * theta
+            end_angle = (i + 1) * theta
 
-            # Compute enpoints of the arc
-            p0 = np.array([radius*cos(start_angle), radius*sin(start_angle)])
-            p3 = np.array([radius*cos(end_angle), radius*sin(end_angle)])
+            # endpoints of the cubic
+            p0 = np.array([radius * np.cos(start_angle), radius * np.sin(start_angle)], dtype=np.float64)
+            p3 = np.array([radius * np.cos(end_angle), radius * np.sin(end_angle)], dtype=np.float64)
 
-            # Compute Tangents(Direction vectors)
-            T0 = np.array([-radius*sin(start_angle), radius*cos(start_angle)])
-            T1 = np.array([-radius*sin(end_angle), -radius*cos(end_angle)])
+            # tangents (directions)
+            T0 = np.array([-np.sin(start_angle), np.cos(start_angle)], dtype=np.float64)
+            T1 = np.array([-np.sin(end_angle), np.cos(end_angle)], dtype=np.float64)
 
-            # Compute control points
-            p1 = p0 + kappa*T0/np.linalg.norm(T0) #we're sure that the direction will never be 0 because it's a circle
-            p2 = p3 - kappa*T1/np.linalg.norm(T1)
+            # control points
+            p1 = p0 + kappa * T0 * radius
+            p2 = p3 - kappa * T1 * radius
 
-            for t in np.linspace(0, 1, n_bezier_points):
-                point = bezier_cubic(t, p0, p1, p2, p3)
-                circle.append(point + center)
+            # sample points along the cubic
+            t_values = np.linspace(0, 1, n_bezier_points, endpoint=False) if i < n_segments - 1 else np.linspace(0, 1, n_bezier_points)
+            for t in t_values:
+                points.append(bezier_cubic(t, p0, p1, p2, p3) + self.center)
 
-        self.add_subpaths(circle, closed=True)
+        self.add_subpaths(points, closed=True)
 
 
 class Square(VMobject):
-    def __init__(self,center, side_len, **settings):
+    def __init__(self, side_len, center= np.array([0,0]), n_points = None, **settings):
         super().__init__(**settings)
         self.close()
-        self.generate_square(center, side_len)
+        self.generate_square(center, side_len, n_points)
     
-    def generate_square(self, center, side_len = 2.0):
+    def generate_square(self, center, side_len = 2.0,n_points = None):
         half = side_len/2
         # Define corners
         corners = [
@@ -623,7 +664,18 @@ class Square(VMobject):
         np.array([half, -half]) + center,
         np.array([-half, -half]) + center
         ]
-        self.set_corners(corners)
+        
+        if n_points is not None:
+            points_per_edge = n_points // 4
+            all_points = []
+            for i in range(4):
+                start = corners[i]
+                end = corners[(i + 1) % 4]
+                for t in np.linspace(0, 1, points_per_edge, endpoint=(i==3)):
+                    all_points.append((1-t)*start + t*end)
+            self.set_corners(np.array(all_points))
+        else:
+            self.set_corners(corners)
 
 
 class Polygon(VMobject):
@@ -633,13 +685,13 @@ class Polygon(VMobject):
         self.generate_polygon(center, n, radius)
         
     def generate_polygon(self, center, n, radius):
-        corners = [np.array([0, radius])]
+        corners = [np.array([0.0, float(radius)])]
         theta = 2*pi/n
         Rotation = np.array([[np.cos(theta), -np.sin(theta)],
                                     [np.sin(theta), np.cos(theta)],])
         
         for i in range(1, n):
-            corners.append(Rotation @ corners[i - 1].T).T
+            corners.append(Rotation @ corners[i - 1])
         
         for i in range(len(corners)):
             corners[i] += center

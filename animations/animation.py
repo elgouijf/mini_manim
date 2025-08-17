@@ -1,37 +1,50 @@
 import mobjects.mobjects as mbj
-from ..utilities.rate_functions import *
+from copy import deepcopy
+from utilities.rate_functions import *
 
 class Animation :
-    def __init__(self, mobject, start_time, end_time, rate_function = smooth):
+    def __init__(self, mobject, start_time, duration, rate_function = smooth):
         mobject.apply_transform()  # clear out any pending transforms
         self.mobject = mobject
         self.rate = rate_function
         self.start_time = start_time
-        self.end_time = end_time
-        self.duration = end_time - start_time
+        self.end_time = start_time + duration
+        self.duration = duration
         self.finished = False
-        self.starting_mobject = mobject.copy()  # make a copy to let the mobject move freely as it is used in here
+        self.starting_mobject = deepcopy(mobject) # make a copy to let the mobject move freely as it is used in here
         
         
 
 class Transform(Animation):
-    def __init__(self, starting_mobject, target_mobject, rate_time=1, rate_function=smooth):
-        super().__init__(starting_mobject, rate_time, rate_function)
+    def __init__(self, starting_mobject, target_mobject, start_time = 0, rate_time=1, rate_function=smooth):
+        super().__init__(starting_mobject, start_time, rate_time, rate_function)
         # make a copy to let the target_mobject move freely as it is used in here
         # otherwise any transformation it submits to will affect the animation
-        self.target_mobject = target_mobject.copy()
+        self.target_mobject = deepcopy(target_mobject)
+        self.mobject = self.starting_mobject  # mobject is the one being animated, not the target
+        # Align points so interpolation works
+        print("Before alignment:")
+        print("Circle points:", len(self.starting_mobject.points))
+        print("Square points:", len(self.target_mobject.points))
+        self.starting_mobject.align_points(self.target_mobject)
+        
+        print("After alignment:")
+        print("Circle points:", len(self.starting_mobject.points))
+        print("Square points:", len(self.target_mobject.points))
+
 
     def interpolate(self, t):
         f_t = self.rate(t)
         self.mobject.interpolate(self.starting_mobject, self.target_mobject, f_t)
- 
+
     def finish(self):
-        self.mobject.interpolate(self.starting_mobject, self.target_mobject, 1)
+        self.mobject.interpolate(self.starting_mobject, self.target_mobject, 1) 
+
 
 
 class Move(Animation):
-    def __init__(self, mobject, target_point, rate_time=1, rate_function=smooth):
-        super().__init__(mobject, rate_time, rate_function)
+    def __init__(self, mobject, target_point,start_time = 0, rate_time=1, rate_function=smooth):
+        super().__init__(mobject, start_time, rate_time, rate_function)
         self.starting_position = self.starting_mobject.get_center()
         self.target_point = target_point
 
@@ -39,7 +52,7 @@ class Move(Animation):
         f_t = self.rate(t)
         inter_x = (1 -f_t)*self.starting_position[0] +f_t*self.target_point[0] 
         inter_y = (1 - f_t)*self.starting_position[1] + f_t*self.target_point[1]
-
+   
         self.mobject.move_to(inter_x, inter_y)
 
     def finish(self):
@@ -49,8 +62,8 @@ class Move(Animation):
 
 
 class Scale(Animation):
-    def __init__(self, mobject, scale, rate_time=1, rate_function=smooth):
-        super().__init__(mobject, rate_time, rate_function)
+    def __init__(self, mobject, scale, start_time = 0, rate_time=1, rate_function=smooth):
+        super().__init__(mobject,start_time, rate_time, rate_function)
         self.scale = scale
 
     def interpolate(self, t):
@@ -65,15 +78,20 @@ class Scale(Animation):
 
 
 class Rotate(Animation):
-    def __init__(self, mobject, theta, rate_time=1, rate_function=smooth):
-        super().__init__(mobject, rate_time, rate_function)
+    def __init__(self, mobject, theta, start_time= 0, rate_time=1, rate_function=smooth):
+        super().__init__(mobject, start_time, rate_time, rate_function)
         self.angle = theta
+        self.prev_angle = 0
 
     def interpolate(self, t):
         f_t = self.rate(t)
-        phi = self.angle*f_t
+        current_angle = self.angle * f_t
+        delta = current_angle - self.prev_angle
+        print("Frame", t, "mobject points:", self.mobject.points.shape)
+
         self.mobject.set_points(self.starting_mobject.points)
-        self.mobject.rotate(phi)
+        self.mobject.rotate(delta)
+        self.prev_angle = current_angle
 
     def finish(self):
         theta = self.angle
@@ -81,8 +99,8 @@ class Rotate(Animation):
 
     
 class Fade(Animation):
-    def __init__(self, mobject, target_opacity, duration=1, rate_func=smooth):
-        super().__init__(mobject, duration, rate_func)
+    def __init__(self, mobject, target_opacity, start_time=0, rate_time=1, rate_func=smooth):
+        super().__init__(mobject, start_time, rate_time, rate_func)
         self.starting_opacity = self.mobject.opacity  # float, no copy()
         self.target_opacity = target_opacity
 
@@ -94,12 +112,12 @@ class Fade(Animation):
         self.mobject.set_opacity(self.target_opacity)
 
 class FadeIn(Fade):
-    def __init__(self, mobject, duration=1, rate_func=smooth):
-        super().__init__(mobject, target_opacity=1, duration=duration, rate_func=rate_func)
+    def __init__(self, mobject, start_time = 0, rate_time=1, rate_func=smooth):
+        super().__init__(mobject, 1, start_time, rate_time, rate_func=rate_func)
         self.starting_opacity = 0  # fade in from invisible
 
 class FadeOut(Fade):
-    def __init__(self, mobject, duration=1, rate_func=smooth):
-        super().__init__(mobject, target_opacity=0, duration=duration, rate_func=rate_func)
+    def __init__(self, mobject, start_time,rate_time=1, rate_func=smooth):
+        super().__init__(mobject, 0, start_time, rate_time, rate_func=rate_func)
         self.starting_opacity = 1  # fade out from visible
 

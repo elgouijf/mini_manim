@@ -49,87 +49,56 @@ class Renderer:
                     'output.mp4'
                 ]
                             
-    def render_polygone(self,mobject ):
-        if mobject.points.shape[0] == 0:
-            return#no points to draw
-        #drawing succesion of points
-        points = mobject.points
-        for i in range(len(points)):
-            if not i:
-                self.ctx.move_to(*points[0])
-            else:
-                self.ctx.line_to(*points[i])
-        self.ctx.line_to(*points[0])
-        #fill options
-        self.ctx.set_source_rgb(mobject.fill_color[0],mobject.fill_color[1],
-                           mobject.fill_color[2])#fill_color
-        self.ctx.fill_preserve()#fill but keep the path
-        self.ctx.set_source_rgb(mobject.stroke_color[0],mobject.stroke_color[1],
-                           mobject.stroke_color[2])
-        self.ctx.set_line_width(2)
-        self.ctx.stroke()
-    #if it is  a vmobject
-    def render_vm(self,vmobject : mbj.VMobject):
+    def render_vm(self, vmobject: mbj.VMobject):
         if not vmobject.submobjects:
             if not vmobject.subpaths:
                 if vmobject.points.shape[0] == 0:
-                    return#no points to draw
+                    return  # nothing to draw
 
-                points = vmobject.points
-                for i in range(len(points)):
-                    if not i:
-                        self.ctx.move_to(*points[0])
-                    else:
-                        self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
-                                        vmobject.stroke_color[2],vmobject.opacity)
-                        self.ctx.line_to(*points[i])
-                        self.ctx.set_line_width(2)
-                        self.ctx.stroke()
+                pts = vmobject.points
+                self.ctx.new_path()
+                self.ctx.move_to(*pts[0])
+                for p in pts[1:]:
+                    self.ctx.line_to(*p)
+
                 if vmobject.close:
-                    self.ctx.line_to(*points[0])
+                    self.ctx.close_path()
+                    # fill first
+                    r, g, b = vmobject.fill_color
+                    self.ctx.set_source_rgba(r, g, b, vmobject.opacity)
+                    self.ctx.fill_preserve()
                 
-                    #fill options
-                    self.ctx.set_source_rgb(vmobject.fill_color[0],vmobject.fill_color[1],
-                                    vmobject.fill_color[2])#fill_color
-                    self.ctx.fill_preserve()#fill but keep the path
-                    self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
-                                    vmobject.stroke_color[2],vmobject.opacity)
-                    self.ctx.paint()
-                    self.ctx.set_line_width(2)
-                    self.ctx.stroke()
-            else:
-                for i,subpath in enumerate(vmobject.subpaths):
-                    if subpath.shape[0] == 0:
-                        continue#no points to draw
+                # stroke outline
+                r, g, b = vmobject.stroke_color
+                self.ctx.set_source_rgba(r, g, b, vmobject.stroke_opacity)
+                self.ctx.set_line_width(vmobject.stroke_width)
+                self.ctx.stroke()
 
-                    points = subpath
-                    for j in range(len(points)):
-                        if not j:
-                            self.ctx.move_to(*points[0])
-                        else:
-                            self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
-                                        vmobject.stroke_color[2],vmobject.opacity)
-                            self.ctx.line_to(*points[j])
-                            self.ctx.set_line_width(2)
-                            self.ctx.stroke()
+            else:
+                for i, subpath in enumerate(vmobject.subpaths):
+                    if subpath.shape[0] == 0:
+                        continue
+
+                    self.ctx.new_path()
+                    self.ctx.move_to(*subpath[0])
+                    for p in subpath[1:]:
+                        self.ctx.line_to(*p)
+
                     if vmobject.closed_subpaths[i]:
-                        self.ctx.line_to(*points[0])
-                    
-                        #fill options
-                        self.ctx.set_source_rgb(vmobject.fill_color[0],vmobject.fill_color[1],
-                                        vmobject.fill_color[2])#fill_color
-                        self.ctx.fill_preserve()#fill but keep the path
-                        self.ctx.set_source_rgba(vmobject.stroke_color[0],vmobject.stroke_color[1],
-                                        vmobject.stroke_color[2],vmobject.opacity)
-                        self.ctx.paint()
-                        self.ctx.set_line_width(2)
-                        self.ctx.stroke()
+                        self.ctx.close_path()
+                        r, g, b = vmobject.fill_color
+                        self.ctx.set_source_rgba(r, g, b, vmobject.opacity)
+                        self.ctx.fill_preserve()
+
+                    r, g, b = vmobject.stroke_color
+                    self.ctx.set_source_rgba(r, g, b, vmobject.stroke_opacity)
+                    self.ctx.set_line_width(vmobject.stroke_width)
+                    self.ctx.stroke()
         else:
-            for submobject in vmobject.submobjects:
-                if isinstance(submobject,mbj.VMobject):
-                    self.render_vm(submobject)
-                else:
-                    continue
+            for sm in vmobject.submobjects:
+                if isinstance(sm, mbj.VMobject):
+                    self.render_vm(sm)
+
     def render_arrow2d(self,arrow : mbj.Arrow2d):
         end_point = arrow.offset + arrow.tip
         tip = arrow.tip
@@ -203,28 +172,73 @@ class Renderer:
             ctx.move_to(x, y)
             ctx.show_text(text_obj.text)
 
+    def render(self, mobject):
+        """
+        Render a mobject using the appropriate method based on its type.
+        """
+        if isinstance(mobject, mbj.VMobject):
+            self.render_vm(mobject)
+        elif isinstance(mobject, mbj.Arrow2d):
+            self.render_arrow2d(mobject)
+        elif isinstance(mobject, mbj.Text):
+            self.render_text(mobject)
+        elif isinstance(mobject, mbj.Line):
+            self.render_line(mobject)
+        else:
+            self.render_polygone(mobject)
 
 
 class Scene:
     """"
     collection of objects to draw
     """
-    def __init__(self,renderer):
+    def __init__(self,renderer, fps = 60):
         self.renderer = renderer
         self.mobjects = []
-    def add(self,mobject):
+        self.frame = 0
+        self.fps = fps
+
+    def add(self, *mobject):
         #storing the list pf visuals
-        self.mobjects.append(mobject)
-    def remove(self,mobject):
+        self.mobjects.extend(mobject)
 
-        for i in range(len(self.mobjects)):
-            if mobject == self.mobjects[i]:
-                self.mobjects.pop(i)
-                break
-    def render(self):
+    def remove(self, *mobjects):
+        for mobj in self.mobjects:
+            if mobj in mobjects:
+                self.mobjects.remove(mobj)
+                
+
+    def render_frame(self, out="output", main_save=True):
+        self.renderer.ctx.set_source_rgb(0, 0, 0) 
+        self.renderer.ctx.paint()
         for mobject in self.mobjects:
-            self.renderer.render_polygon(mobject)
+            self.renderer.render(mobject)
+        self.renderer.render_frame(self.frame, out, main_save)
+        self.frame += 1
 
+    
+    def wait(self, duration, out="output", main_save=True):
+        """
+        Freeze the current frame for `duration` seconds.
+        """
+        frames_to_wait = int(duration * self.fps)
+        for _ in range(frames_to_wait):
+            self.render_frame(out, main_save=main_save)
+
+    def play(self, animation, out_name="output", main_save=True):
+        """
+        Play an animation on the scene.
+        """
+        duration = animation.duration
+        frames = int(duration * self.fps)
+
+        for frame in range(frames):
+            t = frame / (frames - 1) if frames > 1 else 1
+            animation.interpolate(t)
+            """  animation.mobject.apply_transform()  # Apply the transformation to the mobject """
+            print("Frame", frame, "first point:", animation.mobject.points[0])
+            self.render_frame(out_name, main_save=main_save)
+        animation.finish()
 
 def test_mobject_basic_transform():
     mobj = mbj.Mobject()
