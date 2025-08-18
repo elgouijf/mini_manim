@@ -1,6 +1,7 @@
 import mobjects.mobjects as mbj
 from copy import deepcopy
 from utilities.rate_functions import *
+from utilities.color import *
 
 class Animation :
     def __init__(self, mobject, start_time, duration, rate_function = smooth):
@@ -21,17 +22,20 @@ class Transform(Animation):
         # make a copy to let the target_mobject move freely as it is used in here
         # otherwise any transformation it submits to will affect the animation
         self.target_mobject = deepcopy(target_mobject)
-        self.mobject = self.starting_mobject  # mobject is the one being animated, not the target
-        # Align points so interpolation works
-        print("Before alignment:")
-        print("Circle points:", len(self.starting_mobject.points))
-        print("Square points:", len(self.target_mobject.points))
+        
+         # Align points so interpolation works
+        #print("Before alignment:")
+        #print("Circle points:", len(self.starting_mobject.points))
+        #print("Square points:", len(self.target_mobject.points))
         self.starting_mobject.align_points(self.target_mobject)
         
-        print("After alignment:")
-        print("Circle points:", len(self.starting_mobject.points))
-        print("Square points:", len(self.target_mobject.points))
+        #print("After alignment:")
+        #print("Circle points:", len(self.starting_mobject.points))
+        #print("Square points:", len(self.target_mobject.points))
 
+        if isinstance(self.mobject, mbj.VMobject):
+            self.mobject.subpaths = []
+            self.mobject.closed_subpaths = []
 
     def interpolate(self, t):
         f_t = self.rate(t)
@@ -62,19 +66,19 @@ class Move(Animation):
 
 
 class Scale(Animation):
-    def __init__(self, mobject, scale, start_time = 0, rate_time=1, rate_function=smooth):
-        super().__init__(mobject,start_time, rate_time, rate_function)
-        self.scale = scale
+    def __init__(self, mobject, scale, start_time=0, duration=1, rate_function=smooth):
+        super().__init__(mobject, start_time, duration, rate_function)
+        self.target_scale = scale
 
     def interpolate(self, t):
         f_t = self.rate(t)
-        s = 1 + (self.scale - 1)*f_t #scaling starts at 1
+        s = 1 + (self.target_scale - 1) * f_t
+        # reset mobject to starting state at the beginning of animation
+        self.mobject.set_points(self.starting_mobject.points)
         self.mobject.scale(s)
 
     def finish(self):
-        s = self.scale
-        self.mobject.set_points(self.starting_mobject.points)
-        self.mobject.scale(s)
+        self.interpolate(1)
 
 
 class Rotate(Animation):
@@ -87,37 +91,68 @@ class Rotate(Animation):
         f_t = self.rate(t)
         current_angle = self.angle * f_t
         delta = current_angle - self.prev_angle
-        print("Frame", t, "mobject points:", self.mobject.points.shape)
+        """ print("Frame", t, "mobject points:", self.mobject.points.shape) """
 
-        self.mobject.set_points(self.starting_mobject.points)
+        """ self.mobject.set_points(self.starting_mobject.points) """
         self.mobject.rotate(delta)
         self.prev_angle = current_angle
 
     def finish(self):
-        theta = self.angle
-        self.mobject.rotate(theta)
+        self.interpolate(1)
 
     
 class Fade(Animation):
-    def __init__(self, mobject, target_opacity, start_time=0, rate_time=1, rate_func=smooth):
+    def __init__(self, mobject, target_fill_opacity, target_stroke_opacity, start_time=0, rate_time=1, rate_func=smooth):
         super().__init__(mobject, start_time, rate_time, rate_func)
-        self.starting_opacity = self.mobject.opacity  # float, no copy()
-        self.target_opacity = target_opacity
+        self.starting_fill_opacity = self.mobject.fill_opacity  # float, no copy()
+        self.starting_stroke_opacity = self.mobject.stroke_opacity
+        self.target_fill_opacity = target_fill_opacity
+        self.target_stroke_opacity = target_stroke_opacity
+
 
     def interpolate(self, t):
         f_t= self.rate(t)
-        self.mobject.set_opacity((1 - f_t)*self.starting_opacity +  f_t* self.target_opacity)
+        self.mobject.set_fill_opacity((1 - f_t)*self.starting_fill_opacity +  f_t* self.target_fill_opacity)
+        self.mobject.set_stroke_opacity((1 - f_t)*self.starting_stroke_opacity +  f_t* self.target_stroke_opacity)
 
     def finish(self):
-        self.mobject.set_opacity(self.target_opacity)
+        self.interpolate(1)
 
 class FadeIn(Fade):
     def __init__(self, mobject, start_time = 0, rate_time=1, rate_func=smooth):
-        super().__init__(mobject, 1, start_time, rate_time, rate_func=rate_func)
-        self.starting_opacity = 0  # fade in from invisible
+        super().__init__(mobject, 1, 1, start_time, rate_time, rate_func=rate_func)
+        self.starting_fill_opacity = self.mobject.fill_opacity  # fade in from invisible
+        self.starting_stroke_opacity = self.mobject.stroke_opacity
 
 class FadeOut(Fade):
-    def __init__(self, mobject, start_time,rate_time=1, rate_func=smooth):
-        super().__init__(mobject, 0, start_time, rate_time, rate_func=rate_func)
-        self.starting_opacity = 1  # fade out from visible
+    def __init__(self, mobject, start_time = 0,rate_time=1, rate_func=smooth):
+        super().__init__(mobject, 0, 0, start_time, rate_time, rate_func=rate_func)
+        self.starting_fill_opacity = self.mobject.fill_opacity  # fade out from visible
+        self.starting_stroke_opacity = self.mobject.stroke_opacity
+
+
+class ColorChange(Animation):
+    def __init__(self, mobject, target_fill_color, target_stroke_color, start_time=0, rate_time=1, rate_function=smooth):
+        super().__init__(mobject, start_time, rate_time, rate_function)
+        self.starting_fill_color = self.mobject.fill_color
+        self.target_fill_color = target_fill_color
+        self.starting_stroke_color = self.mobject.stroke_color
+        self.target_stroke_color = target_stroke_color
+        # maintain the same opacity as before
+        
+        
+
+    def interpolate(self, t):
+        f_t = self.rate(t)
+
+        new_fill_color = interpolate_colors(self.starting_fill_color, self.target_fill_color, f_t)
+        self.mobject.set_fill_color(new_fill_color)
+        """ print(self.mobject.fill_opacity) """
+
+        new_stroke_color = interpolate_colors(self.starting_stroke_color, self.target_stroke_color, f_t)
+        self.mobject.set_stroke_color(new_stroke_color)
+        """ print(self.mobject.stroke_opacity) """
+
+    def finish(self):
+        self.interpolate(1)
 

@@ -5,7 +5,7 @@ from utilities.bezier import *
 import inspect
 import cairo
 from copy import deepcopy
-
+from utilities.color import *
 def resize_preserving_order(points, new_length):
     """
     Given an array of points, return a new array with exactly new_length points,
@@ -41,7 +41,7 @@ class Mobject:
         self.stroke_color = (settings.get("stroke_color", DEFAULT_STROKE_COLOR)).get_rgb()  # Convert color to RGB tuple
         self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
         self.fill_color = (settings.get("fill_color", DEFAULT_FILL_COLOR)).get_rgb()  # Convert color to RGB tuple
-        self.opacity = settings.get("fill_opacity", DEFAULT_FILL_OPACITY)
+        self.fill_opacity = settings.get("fill_opacity", DEFAULT_FILL_OPACITY)
         self.stroke_opacity = settings.get("stroke_opacity", DEFAULT_STROKE_OPACITY)
         self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
         self.transform_matrix = np.identity(3) # we'll be using homogenous coordinates
@@ -131,12 +131,18 @@ class Mobject:
         # reset transform_matrix
         self.transform_matrix = np.identity(3)
 
-    def set_opacity(self, opacity):
-        self.opacity = opacity
+    def set_fill_opacity(self, opacity):
+        self.fill_opacity = opacity
 
+    def set_stroke_opacity(self, opacity):
+        self.stroke_opacity = opacity
+        
         
     def set_fill_color(self, color):
-        self.fill_color = color
+        self.fill_color =  ensure_rgb(color) # Convert color to RGB tuple
+
+    def set_stroke_color(self, color):
+        self.stroke_color = ensure_rgb(color)  # Convert color to RGB tuple
 
 
     def set_stroke(self, color=None, width=None, opacity=None):
@@ -653,7 +659,8 @@ class Square(VMobject):
     def __init__(self, side_len, center= np.array([0,0]), n_points = None, **settings):
         super().__init__(**settings)
         self.close()
-        self.generate_square(center, side_len, n_points)
+        self.side_len = side_len
+        self.generate_square(center, self.side_len, n_points)
     
     def generate_square(self, center, side_len = 2.0,n_points = None):
         half = side_len/2
@@ -673,8 +680,10 @@ class Square(VMobject):
                 end = corners[(i + 1) % 4]
                 for t in np.linspace(0, 1, points_per_edge, endpoint=(i==3)):
                     all_points.append((1-t)*start + t*end)
+            all_points.append(all_points[0])  # close path
             self.set_corners(np.array(all_points))
         else:
+            corners.append(corners[0])  # close path
             self.set_corners(corners)
 
 

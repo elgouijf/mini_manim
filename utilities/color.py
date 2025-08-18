@@ -32,6 +32,13 @@ def ensure_color(color):
     raise TypeError(f"Cannot convert type {type(color)} to Color")
 
 
+def ensure_rgb(color):
+    """
+    Converts Color, string, or tuple to RGB tuple (r,g,b) with floats 0..1
+    """
+    c = ensure_color(color)  # your current function returns a Color object
+    return c.get_rgb()       # tuple (r,g,b)
+
 
 def hex_to_rgb(hex_color):
     """
@@ -62,7 +69,7 @@ def interpolate_colors(color1, color2, t): # in every single function here we su
     g = (1 - t)*g1 + t*g2
     b = (1 - t)*b1 + t*b2
 
-    return Color(rgb = (r,g,b))
+    return r, g, b
 
 def lighten(color, amount= 0.1):
     return interpolate_colors(color, WHITE, amount)

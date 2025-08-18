@@ -1,5 +1,5 @@
 import os
-
+from utilities.color import *
 import sys
 import cairo
 
@@ -61,11 +61,11 @@ class Renderer:
                 for p in pts[1:]:
                     self.ctx.line_to(*p)
 
-                if vmobject.close:
+                if vmobject.closed:
                     self.ctx.close_path()
                     # fill first
                     r, g, b = vmobject.fill_color
-                    self.ctx.set_source_rgba(r, g, b, vmobject.opacity)
+                    self.ctx.set_source_rgba(r, g, b, vmobject.fill_opacity)
                     self.ctx.fill_preserve()
                 
                 # stroke outline
@@ -235,10 +235,11 @@ class Scene:
         for frame in range(frames):
             t = frame / (frames - 1) if frames > 1 else 1
             animation.interpolate(t)
-            """  animation.mobject.apply_transform()  # Apply the transformation to the mobject """
-            print("Frame", frame, "first point:", animation.mobject.points[0])
+            animation.mobject.apply_transform()  # Apply the transformation to the mobject
+            """ print("Frame", frame, "first point:", animation.mobject.points[0]) """
             self.render_frame(out_name, main_save=main_save)
-        animation.finish()
+        animation.finish()  # Ensure the final state is applied
+        animation.mobject.apply_transform()  # Apply the final transformation to the mobject
 
 def test_mobject_basic_transform():
     mobj = mbj.Mobject()

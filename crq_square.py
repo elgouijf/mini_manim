@@ -2,8 +2,9 @@ import numpy as np
 import cairo
 from manim_bg.renderer import Scene, Renderer
 from mobjects.mobjects import Circle, Square, Polygon
-from animations.animation import Transform, Move, Rotate
+from animations.animation import Transform, Move, Rotate, Scale, ColorChange, FadeIn, FadeOut, Fade
 from math import pi
+from utilities.color import *
 
 WIDTH, HEIGHT, FPS = 4096, 2160, 60
 
@@ -26,28 +27,66 @@ class CircleToSquare(ClearScreenScene):
     def construct(self):
         # Create a larger circle and square centered on screen
         circle = Circle(radius=100.0, center=np.array([WIDTH/2, HEIGHT/2]))
-        polygon = Polygon(radius=100, center=np.array([WIDTH/2, HEIGHT/2]), n =32)
+        polygone = Polygon(radius=100, center=np.array([WIDTH/2, HEIGHT/2]), n =8)
         square = Square(side_len=200.0, center=np.array([WIDTH/2, HEIGHT/2]))
+        triangle = Polygon(radius=100, center=np.array([WIDTH/2, HEIGHT/2]), n=3)
+
+        polygones = []
+        for i in range(1,9):
+            poly = Polygon(radius=200, center=np.array([WIDTH/2, HEIGHT/2]), n=i+3)
+            polygones.append(poly)
 
         # Explicitly set colors
         circle.set_fill_color((0, 0, 0))   # blue fill
         circle.stroke_color = (0, 0, 1)    # blue stroke
-        polygon.set_fill_color((0, 1, 0))   # red fill
-        polygon.stroke_color = (0, 1, 0)    # red stroke
+        polygone.set_fill_color((0, 1, 0))   # red fill
+        polygone.stroke_color = (0, 1, 0)    # red stroke
         square.set_fill_color((0, 0, 0))   # red fill
-        square.set_opacity(0.0)
-        square.stroke_color = (0, 0, 1)    # red stroke
+        square.set_fill_opacity(0.0)
+        square.stroke_color = (1, 0, 0)    # red stroke
 
         """ print("Circle points before animation:", circle.points.shape)
         print("First 5 points:", circle.points[:5])
         self.add(circle) """
-        self.add(circle)
+    
         
-        self.wait(1)
+        
+        """ print(square.fill_opacity) """
         """ self.play(Rotate(circle, pi/4)) """
-        self.play(Transform(circle, square))
+        self.add(square)
+        self.wait(0.05)
+        self.play(Rotate(square, pi/4))
+        self.wait(0.05)
+        self.wait(0.05)
+        self.play(Rotate(square, -pi/4))
+        self.play(Transform(square, circle))
+        self.wait(0.05)
+        self.play(Transform(square, polygone))
+        self.wait(0.05)
+        self.play(Transform(square, triangle))
+        self.wait(0.05)
+        self.play(Scale(square, 2))
+        self.wait(0.05)
+        self.play(Rotate(square, pi))
+        self.wait(0.05)
+        self.play(ColorChange(square, WHITE, GREEN))
+        self.wait(0.05)
+        self.play(FadeOut(square))
+        self.wait(0.05)
+        self.play(Fade(square, target_fill_opacity=0, target_stroke_opacity=1))
+        side = square.side_len
+        self.play(Move(square, square.get_center() + np.array([WIDTH/2 - side, 0.0])))
+        self.play(Move(square, np.array([side, HEIGHT/2])))
+        self.play(Move(square, np.array([WIDTH/2, HEIGHT/2])))
 
-        self.wait(1)
+        for i in range(0, len(polygones)):
+            self.play(Transform(square, polygones[i]))
+            self.wait(0.05)
+
+        self.play(Transform(square, Circle(radius=200.0, center=np.array([WIDTH/2, HEIGHT/2]))))
+        self.wait(0.05)
+        self.play(Transform(square, Square(side_len=200.0, center=np.array([WIDTH/2, HEIGHT/2]))))
+
 
 # Run the scene
 scene_instance = CircleToSquare(renderer, fps=FPS)
