@@ -148,7 +148,7 @@ class Mobject:
     def set_stroke(self, color=None, width=None, opacity=None):
         """Set the stroke (outline) style of the shape."""
         if color is not None:
-            self.stroke_color = color
+            self.set_stroke_color(color)
         if width is not None:
             self.stroke_width = width
         if opacity is not None:
@@ -223,7 +223,7 @@ class Group(Mobject):
     
     def refresh_points(self):
         """ Refreshes the points of the group by combining the points of all submobjects """
-        if self.is_empty(self):
+        if self.is_empty():
             self.points = np.zeros((0, 2))
         else:
             self.points = np.vstack([mobj.points for mobj in self.submobjects])
@@ -399,7 +399,7 @@ class Point(Mobject):
 
 
 class Dot(Point):
-    def __init__(self, radius = 0.1, artificial_width = 1e-5, artificial_height = 1e-5, position = np.array([0,0]), **settings):
+    def __init__(self, radius = 1e-5, artificial_width = 1e-5, artificial_height = 1e-5, position = np.array([0,0]), **settings):
         super().__init__(artificial_width, artificial_height, position, **settings)
         self.radius = radius
         self.generate_dot()
@@ -410,7 +410,7 @@ class Dot(Point):
         self.set_points(circle.points)  # Set the points of the dot to the points of the circle
         
 class GlowingDot(Dot, VGroup):
-    def __init__(self, radius = 0.1, position = np.array([0,0]), glow_radius = 0.2, **settings):
+    def __init__(self, radius = 1e-5, position = np.array([0,0]), glow_radius = 0.2, **settings):
         super().__init__(radius=radius, position=position, **settings)
         self.glow_radius = glow_radius
         self.generate_glowing_dot()
@@ -418,14 +418,36 @@ class GlowingDot(Dot, VGroup):
     def generate_glowing_dot(self):
         """ Generates the glowing dot by creating a circle with the given glow radius """
         glow_extend = self.glow_radius - self.radius
-        glow_layers = max(1, int(glow_extend*10))  # Number of layers to create a glow effect
-
+        glow_layers = max(1, int(glow_extend/2))  # Number of layers to create a glow effect
+        print(self.fill_color)
+        fill_color = getattr(self, "fill_color", (1, 1, 1))
+        fill_opacity = getattr(self, "fill_opacity", 1.0)
+        fill_opacity = fill_opacity*(1 - 0.4)
+        
         for i in reversed(range(glow_layers)): # Create a series of circles to simulate a glow effect
             circle = Circle(radius=self.radius + (i/glow_layers)*glow_extend, center=self.points[0])
-            circle.set_fill_color(self.fill_color)
+            circle.set_fill_color(fill_color)
             circle.set_stroke(width= 0, opacity= 0)
-            circle.set_opacity(self.opacity * (1 - i / glow_layers))  # Fade out the glow effect
-            self.add_objs(circle)  # Add the circle to the group of glowing dots   
+            circle.set_fill_opacity(fill_opacity * (1 - i / glow_layers)**4)  # Fade out the glow effect
+
+            """ print("Circle color",circle.fill_color)
+            print("Circle stroke width",circle.stroke_width) """
+            
+            if circle.fill_opacity > 0.01:
+                print("Circle opacity", circle.fill_opacity)
+                for i in range(2):
+                    self.add_objs(circle)
+
+            else: 
+                fixed_circle = Circle(radius=self.radius + (i/glow_layers)*glow_extend, center=self.points[0])
+                fixed_circle.set_fill_color(fill_color)
+                fixed_circle.set_stroke(width= 0, opacity= 0)
+                fixed_circle.set_fill_opacity(0.01) 
+                print("Circle opacity", 0.01)
+
+                for i in range(2):
+                    self.add_objs(fixed_circle)
+               
 
 class FunctionGraph(VMobject):
     """

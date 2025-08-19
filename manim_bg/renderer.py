@@ -87,7 +87,8 @@ class Renderer:
                     if vmobject.closed_subpaths[i]:
                         self.ctx.close_path()
                         r, g, b = vmobject.fill_color
-                        self.ctx.set_source_rgba(r, g, b, vmobject.opacity)
+                        """ print("DEBUG FILL COLOR:", r, g, b, "opacity=", vmobject.fill_opacity) """
+                        self.ctx.set_source_rgba(r, g, b, vmobject.fill_opacity)
                         self.ctx.fill_preserve()
 
                     r, g, b = vmobject.stroke_color

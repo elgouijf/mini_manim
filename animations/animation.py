@@ -118,11 +118,13 @@ class Fade(Animation):
     def finish(self):
         self.interpolate(1)
 
+
 class FadeIn(Fade):
     def __init__(self, mobject, start_time = 0, rate_time=1, rate_func=smooth):
         super().__init__(mobject, 1, 1, start_time, rate_time, rate_func=rate_func)
         self.starting_fill_opacity = self.mobject.fill_opacity  # fade in from invisible
         self.starting_stroke_opacity = self.mobject.stroke_opacity
+
 
 class FadeOut(Fade):
     def __init__(self, mobject, start_time = 0,rate_time=1, rate_func=smooth):

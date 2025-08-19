@@ -6,7 +6,7 @@ BLACK = Color("black")
 RED = Color("red")
 GREEN = Color("green")
 BLUE = Color("blue")
-YELLOW = Color("Yellow")
+YELLOW = Color("yellow")
 PURPLE = Color("purple") # Hollow purple go brrrr
 ORANGE = Color("orange")
 
