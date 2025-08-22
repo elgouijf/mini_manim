@@ -1,7 +1,7 @@
 import numpy as np
 import cairo
 from manim_bg.renderer import Scene, Renderer
-from mobjects.mobjects import Circle, Square, Polygon, Dot, GlowingDot, Point
+from mobjects.mobjects import Circle, Square, Polygon, Dot, GlowingDot, Point, Group, VGroup
 from animations.animation import Transform, Move, Rotate, Scale, ColorChange, FadeIn, FadeOut, Fade
 from math import pi
 from utilities.color import *
@@ -13,25 +13,38 @@ ctx = cairo.Context(surface)
 renderer = Renderer(surface, ctx, FPS, WIDTH, HEIGHT, file_name="dot.mp4")
 
 print(Color("yellow").get_rgb())
-print(Color("Yellow").get_rgb())  
+print(Color("Yellow").get_rgb())
+
 class dot_scene(Scene):
     def construct(self):
+        dot = GlowingDot(glow_radius= 200.0, position=np.array([WIDTH/2, HEIGHT/2]), fill_color=YELLOW)
+        circle = Circle(center = np.array([WIDTH/2, HEIGHT/2]), radius=50.0)
         
-        dot = GlowingDot(glow_radius= 20.0, position=np.array([WIDTH/2, HEIGHT/2]), fill_color=YELLOW)
-        circle = Circle(center = np.array([WIDTH/2, HEIGHT/2]), radius=200.0)
-        dot.fill_color = YELLOW
-        dot.stroke_color = YELLOW
         circle.fill_opacity = 0.0
         circle.set_stroke_color(RED)
         print("dot.fill_color =", dot.fill_color)
         print("resolved color =", ensure_color(dot.fill_color).get_rgb())
         print("fill_opacity =", dot.fill_opacity)
 
-        self.add(circle)
+        """ mobjects = [dot, circle]
+        group = VGroup(*mobjects) """
+        """ self.add(circle) """
+        print("Dot color", dot.fill_color)
         self.add(dot)
+        self.wait(1)
+        """self.play(ColorChange(dot, target_fill_color= BLUE))
+        print("Dot color", dot.fill_color)
+        print("Dot circle color", dot.submobjects[0].fill_color)
+        self.wait(1)
+        self.play(ColorChange(dot, target_fill_color= RED))
+        print("Dot color", dot.fill_color)
+        self.wait(1)
+        self.wait(1)
+        self.play(Move(dot, np.array([3*WIDTH/4, HEIGHT/2]))) """
+        self.play(Scale(dot, 3)) 
+
 
         self.wait(1)
-
 
 
 # Run the scene

@@ -54,8 +54,8 @@ class Move(Animation):
 
     def interpolate(self, t):
         f_t = self.rate(t)
-        inter_x = (1 -f_t)*self.starting_position[0] +f_t*self.target_point[0] 
-        inter_y = (1 - f_t)*self.starting_position[1] + f_t*self.target_point[1]
+        inter_x = (1 -f_t)*self.starting_position[0] +f_t*(self.target_point[0] )
+        inter_y = (1 - f_t)*self.starting_position[1] + f_t*(self.target_point[1])
    
         self.mobject.move_to(inter_x, inter_y)
 
@@ -134,7 +134,7 @@ class FadeOut(Fade):
 
 
 class ColorChange(Animation):
-    def __init__(self, mobject, target_fill_color, target_stroke_color, start_time=0, rate_time=1, rate_function=smooth):
+    def __init__(self, mobject, target_fill_color = PURPLE, target_stroke_color= PURPLE, start_time=0, rate_time=1, rate_function=smooth):
         super().__init__(mobject, start_time, rate_time, rate_function)
         self.starting_fill_color = self.mobject.fill_color
         self.target_fill_color = target_fill_color
@@ -149,7 +149,7 @@ class ColorChange(Animation):
 
         new_fill_color = interpolate_colors(self.starting_fill_color, self.target_fill_color, f_t)
         self.mobject.set_fill_color(new_fill_color)
-        """ print(self.mobject.fill_opacity) """
+        print(self.mobject.fill_color)
 
         new_stroke_color = interpolate_colors(self.starting_stroke_color, self.target_stroke_color, f_t)
         self.mobject.set_stroke_color(new_stroke_color)

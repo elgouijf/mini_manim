@@ -6,6 +6,7 @@ import inspect
 import cairo
 from copy import deepcopy
 from utilities.color import *
+
 def resize_preserving_order(points, new_length):
     """
     Given an array of points, return a new array with exactly new_length points,
@@ -207,19 +208,10 @@ class Group(Mobject):
         self.submobjects = list(mobjects)
         self.refresh_points()  # Refresh points after adding mobjects
 
-    def add_objs(self, *mobjects):
-        self.submobjects.extend(mobjects)
-
-    def remove(self, mobject):
-        try:
-            self.submobjects.remove(mobject)
-        except ValueError:
-            print(f"Warning: {mobject} is not a part of {self.name}")
-
-    def get_center(self):
-        # get the group's center
-        points = np.vstack([mobj.points for mobj in self.submobjects])
-        return np.mean(points, axis=0)
+    
+    def is_empty(self):
+        """ Checks if the group has no submobjects """
+        return len(self.submobjects) == 0
     
     def refresh_points(self):
         """ Refreshes the points of the group by combining the points of all submobjects """
@@ -228,32 +220,69 @@ class Group(Mobject):
         else:
             self.points = np.vstack([mobj.points for mobj in self.submobjects])
 
+    def add_objs(self, *mobjects):
+        self.submobjects.extend(mobjects)
+
+    def remove(self, mobject):
+        try:
+            self.submobjects.remove(mobject)
+        except ValueError:
+            print(f"Warning: {mobject} is not a part of {self.name}")
+        self.refresh_points()
+
+    def get_center(self):
+        # get the group's center
+        points = np.vstack([mobj.points for mobj in self.submobjects])
+        return np.mean(points, axis=0)
+    
     def move_to(self, x, y):
+        Mobject.move_to(self, x, y)
         for mobj in self.submobjects:
             mobj.move_to(x, y)
+        self.refresh_points()
         
 
     def scale(self, s):
         for mobj in self.submobjects:
             mobj.scale(s)
+        self.refresh_points()
 
 
     def rotate(self, theta):
+        Mobject.rotate(self, theta)
         for mobj in self.submobjects:
             mobj.rotate(theta)
+        self.refresh_points
 
 
-    def set_opacity(self, opacity):
+    def set_fill_opacity(self, opacity):
         for mobj in self.submobjects:
-            mobj.set_opacity(opacity)
+            mobj.set_fill_opacity(opacity)
+    
+    def set_stroke_opacity(self, opacity):
+        for mobj in self.submobjects:
+            mobj.set_stroke_opacity(opacity)
 
     def set_fill_color(self, color):
+        Mobject.set_fill_color(self, color)
         for mobj in self.submobjects:
             mobj.set_fill_color(color)
     
     def set_stroke_color(self, color):
+        Mobject.set_stroke_color(self,color)
         for mobj in self.submobjects:
             mobj.set_stroke_color(color)
+
+    def set_stroke(self, color=None, width=None, opacity=None):
+        """Set the stroke (outline) style of the shape."""
+        if color is not None:
+            self.set_stroke_color(color)
+        if width is not None:
+            self.stroke_width = width
+        if opacity is not None:
+            self.stroke_opacity = opacity
+        return self
+
 
     def add_updater(self, update_func):
         """ Adds an updater to all submobjects in the group """
@@ -272,9 +301,6 @@ class Group(Mobject):
             mobj.run_updates(*args, **kwargs)
         self.refresh_points()
 
-    def is_empty(self):
-        """ Checks if the group has no submobjects """
-        return len(self.submobjects) == 0
         
     def apply_transform(self):
         for mobj in self.submobjects:
@@ -348,8 +374,9 @@ class VMobject(Mobject):
 
 class VGroup(Group, VMobject): # Group must come first for methods to follow MRO (Method Resolution Order)
     def __init__(self, *vmobjects, **settings):
-        Group.__init__(self, *vmobjects, **settings) # initialize the group part
+        # initialize the VMobject part first as it turns submobjects into an empty list
         VMobject.__init__(self, **settings) # initialize the VMobject part
+        Group.__init__(self, *vmobjects, **settings) # initialize the group part
         self.refresh_points()  # Refresh points after adding mobjects
     
     def close(self):
@@ -360,6 +387,8 @@ class VGroup(Group, VMobject): # Group must come first for methods to follow MRO
     
     def refresh_subpaths(self):
         """ Refreshes the subpaths of the VGroup by combining the subpaths of all submobjects """
+        if not self.subpaths:
+            return
         self.subpaths = []
         self.closed_subpaths = []
         for mobj in self.submobjects:
@@ -384,6 +413,14 @@ class VGroup(Group, VMobject): # Group must come first for methods to follow MRO
         self.refresh_points()
         self.refresh_subpaths()
 
+    def set_stroke_color(self, color):
+        Group.set_stroke_color(self, color)
+    
+    def set_fill_color(self, color):
+        Group.set_fill_color(self, color)
+
+    def scale(self,s):
+        Group.scale(self, s)
 
 
 class Point(Mobject):
@@ -409,45 +446,52 @@ class Dot(Point):
         circle = Circle(radius=self.radius, center=self.points[0]) # n_segments will be at default since a Dot is small enough for it to work
         self.set_points(circle.points)  # Set the points of the dot to the points of the circle
         
-class GlowingDot(Dot, VGroup):
-    def __init__(self, radius = 1e-5, position = np.array([0,0]), glow_radius = 0.2, **settings):
-        super().__init__(radius=radius, position=position, **settings)
+class GlowingDot(VGroup):
+    def __init__(self, radius=1e-5, position=np.array([0,0]), glow_radius=0.2, **settings):
+        dot = Dot(radius=radius, position=position, **settings)
+        super().__init__(dot, **settings)
         self.glow_radius = glow_radius
+        self.radius = dot.radius
+        self.original_radius = dot.radius
+        self.original_glow_radius = glow_radius
+        self.position = position
         self.generate_glowing_dot()
 
     def generate_glowing_dot(self):
-        """ Generates the glowing dot by creating a circle with the given glow radius """
-        glow_extend = self.glow_radius - self.radius
-        glow_layers = max(1, int(glow_extend/2))  # Number of layers to create a glow effect
-        print(self.fill_color)
-        fill_color = getattr(self, "fill_color", (1, 1, 1))
-        fill_opacity = getattr(self, "fill_opacity", 1.0)
-        fill_opacity = fill_opacity*(1 - 0.4)
-        
-        for i in reversed(range(glow_layers)): # Create a series of circles to simulate a glow effect
-            circle = Circle(radius=self.radius + (i/glow_layers)*glow_extend, center=self.points[0])
-            circle.set_fill_color(fill_color)
-            circle.set_stroke(width= 0, opacity= 0)
-            circle.set_fill_opacity(fill_opacity * (1 - i / glow_layers)**4)  # Fade out the glow effect
-
-            """ print("Circle color",circle.fill_color)
-            print("Circle stroke width",circle.stroke_width) """
+        """Generates the glowing dot by creating a circle with the given glow radius"""
+        # Clear existing glow layers (keep the base dot)
+        while len(self.submobjects) > 1:
+            self.remove(self.submobjects[-1])
             
-            if circle.fill_opacity > 0.01:
-                print("Circle opacity", circle.fill_opacity)
-                for i in range(2):
-                    self.add_objs(circle)
+        glow_extend = self.glow_radius - self.radius
+        glow_layers = max(1, int(glow_extend / 2))
+        print("glow layers ", glow_layers)
+        fill_color = getattr(self, "fill_color", (1, 1, 1))
+        fill_opacity = getattr(self, "fill_opacity", 1.0) * (1 - 0.4)
+        
 
-            else: 
-                fixed_circle = Circle(radius=self.radius + (i/glow_layers)*glow_extend, center=self.points[0])
-                fixed_circle.set_fill_color(fill_color)
-                fixed_circle.set_stroke(width= 0, opacity= 0)
-                fixed_circle.set_fill_opacity(0.01) 
-                print("Circle opacity", 0.01)
+        for i in reversed(range(glow_layers)):
+            print(glow_layers - i)
+            circle = Circle(radius=(self.radius + (i/glow_layers)*glow_extend), 
+                           center=self.position)
+            circle.set_fill_color(fill_color)
+            circle.set_stroke(width=0, opacity=0)
+            circle.set_fill_opacity(fill_opacity * (1 - i / glow_layers)**4)
+            self.add_objs(circle)
 
-                for i in range(2):
-                    self.add_objs(fixed_circle)
-               
+    def scale(self, s):
+        # DON'T call super().scale(s) - that would scale all submobjects
+        # Instead, manually scale only what needs to be scaled
+        
+        # Update the base dot's radius and position
+        self.submobjects[0].radius = self.original_radius * s
+        self.submobjects[0].generate_dot()  # Regenerate the dot with new radius
+        self.submobjects[0].move_to(self.position[0], self.position[1])
+        
+        # Regenerate glow layers with scaled radii
+        self.radius = self.original_radius*s
+        self.glow_radius = self.original_glow_radius*s
+        self.generate_glowing_dot()
 
 class FunctionGraph(VMobject):
     """
@@ -631,9 +675,6 @@ class Arrow2d(Vector2D):
         return line.tangent(),line.offset
     
 
-
-    
-
 class Circle(VMobject):
     def __init__(self, n_segments=4, center=np.array([0.0, 0.0]), radius=1.0, n_bezier_points=60, **settings):
         super().__init__(**settings)
@@ -674,8 +715,12 @@ class Circle(VMobject):
             for t in t_values:
                 points.append(bezier_cubic(t, p0, p1, p2, p3) + self.center)
 
-        self.add_subpaths(points, closed=True)
+        self.set_corners(points)
+        self.close()
 
+    def scale(self, s):
+        self.radius *= s
+        super().scale(s)
 
 class Square(VMobject):
     def __init__(self, side_len, center= np.array([0,0]), n_points = None, **settings):
