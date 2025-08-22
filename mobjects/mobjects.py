@@ -450,11 +450,13 @@ class GlowingDot(VGroup):
     def __init__(self, radius=1e-5, position=np.array([0,0]), glow_radius=0.2, **settings):
         dot = Dot(radius=radius, position=position, **settings)
         super().__init__(dot, **settings)
+        self.core = dot
         self.glow_radius = glow_radius
         self.radius = dot.radius
         self.original_radius = dot.radius
         self.original_glow_radius = glow_radius
         self.position = position
+        self.original_circles = [dot]
         self.generate_glowing_dot()
 
     def generate_glowing_dot(self):
@@ -477,22 +479,16 @@ class GlowingDot(VGroup):
             circle.set_fill_color(fill_color)
             circle.set_stroke(width=0, opacity=0)
             circle.set_fill_opacity(fill_opacity * (1 - i / glow_layers)**4)
+            self.original_circles.append(circle)
             self.add_objs(circle)
 
     def scale(self, s):
-        # DON'T call super().scale(s) - that would scale all submobjects
-        # Instead, manually scale only what needs to be scaled
-        
-        # Update the base dot's radius and position
-        self.submobjects[0].radius = self.original_radius * s
-        self.submobjects[0].generate_dot()  # Regenerate the dot with new radius
-        self.submobjects[0].move_to(self.position[0], self.position[1])
-        
-        # Regenerate glow layers with scaled radii
-        self.radius = self.original_radius*s
-        self.glow_radius = self.original_glow_radius*s
-        self.generate_glowing_dot()
+        for i in range(len(self.original_circles)):
+            circle = deepcopy(self.original_circles[i])
+            circle.scale(s)
+            self.submobjects[i] = circle
 
+        
 class FunctionGraph(VMobject):
     """
     a class for dealing with function graphs
