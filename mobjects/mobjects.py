@@ -46,8 +46,13 @@ class Mobject:
         self.stroke_opacity = settings.get("stroke_opacity", DEFAULT_STROKE_OPACITY)
         self.stroke_width = settings.get("stroke_width", DEFAULT_STROKE_WIDTH)
         self.transform_matrix = np.identity(3) # we'll be using homogenous coordinates
+        self.pre_state = deepcopy(self.points)
+        self.original_caracteristic = None
+        self.scale_caracteristic = None
+        self.rotated = False
 
         self.submobjects = [] # object starts with no children
+        self.updaters =[] # object starts with no updaters
 
         self.name = self.__class__.__name__ # object gets the name of the runtime class of the instance (Mobject or a subclass)
 
@@ -108,6 +113,10 @@ class Mobject:
 
         
         self.transform_matrix = scaling_matrix @ self.transform_matrix
+        if not self.scale_caracteristic:
+            self.scale_caracteristic = s* self.original_caracteristic
+        else:
+            self.scale_caracteristic *= s
 
     def rotate(self, theta):
 
@@ -121,6 +130,7 @@ class Mobject:
 
         rotation_matrix = T2 @ R@ T1
         self.transform_matrix = rotation_matrix @ self.transform_matrix
+        self.rotated = True
 
 
     def apply_transform(self):
@@ -429,6 +439,10 @@ class Point(Mobject):
         self.artificial_width = artificial_width
         self.artificial_height = artificial_height
         self.set_position(position)
+        self.pre_state = deepcopy(self.points)
+        self.original_caracteristic = (artificial_height, artificial_width)
+
+
 
     def set_position(self, position):
         """ Sets the position of the point """
@@ -440,11 +454,15 @@ class Dot(Point):
         super().__init__(artificial_width, artificial_height, position, **settings)
         self.radius = radius
         self.generate_dot()
+        self.pre_state = deepcopy(self.points)
+        self.original_caracteristic = radius
+
 
     def generate_dot(self):
         """ Generates the dot by creating a circle with the given radius """
         circle = Circle(radius=self.radius, center=self.points[0]) # n_segments will be at default since a Dot is small enough for it to work
         self.set_points(circle.points)  # Set the points of the dot to the points of the circle
+        
         
 class GlowingDot(VGroup):
     def __init__(self, radius=1e-5, position=np.array([0,0]), glow_radius=0.2, **settings):
@@ -458,6 +476,9 @@ class GlowingDot(VGroup):
         self.position = position
         self.original_circles = [dot]
         self.generate_glowing_dot()
+        self.pre_state = deepcopy(self.points)
+        self.original_caracteristic = radius
+
 
     def generate_glowing_dot(self):
         """Generates the glowing dot by creating a circle with the given glow radius"""
@@ -503,6 +524,7 @@ class FunctionGraph(VMobject):
         self.error = error
         self.closed = closed
         self.generate_graph(n_bezier_points)
+        self.pre_state = deepcopy(self.points)
 
                 
     
@@ -522,8 +544,8 @@ class FunctionGraph(VMobject):
             for t in np.linspace(0, 1, n_bezier_points):
                 point = bezier_cubic(t, p0, p1, p2, p3)
                 curve.append(point)
-
-        self.add_subpaths(curve, self.closed)
+        self.close()
+        self.set_corners(curve)
                 
 
 
@@ -681,6 +703,9 @@ class Circle(VMobject):
             raise ValueError("n_segments must be a multiple of 4")
         self.n_segments = n_segments
         self.generate_circle(n_bezier_points)
+        self.pre_state = deepcopy(self.points)
+        self.original_caracteristic = radius
+
 
     def generate_circle(self, n_bezier_points):
         radius = self.radius
@@ -724,6 +749,9 @@ class Square(VMobject):
         self.close()
         self.side_len = side_len
         self.generate_square(center, self.side_len, n_points)
+        self.pre_state = deepcopy(self.points)
+        self.original_caracteristic = side_len
+
     
     def generate_square(self, center, side_len = 2.0,n_points = None):
         half = side_len/2
@@ -755,6 +783,8 @@ class Polygon(VMobject):
         super().__init__(**settings)
         self.close()
         self.generate_polygon(center, n, radius)
+        self.pre_state = deepcopy(self.points)
+        self.original_caracteristic = radius
         
     def generate_polygon(self, center, n, radius):
         corners = [np.array([0.0, float(radius)])]

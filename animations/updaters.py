@@ -6,9 +6,14 @@ down = "down"
 right = "right"
 left = "left"
 
-def rotate_continuous(mobj,  dt = 0.1, ang_speed = np.pi/4):
+def rotate_continuous(mobj,  dt = 0.1, ang_speed = np.pi/4, iteration = 0):
     """ ang_speed = #angle per second """
-    mobj.rotate(ang_speed * dt)
+    if not mobj.rotated:
+        mobj.rotate(ang_speed * dt * iteration)
+    else:
+        mobj.rotate(-(ang_speed * dt * (iteration - 1)))
+        mobj.rotate(ang_speed * dt * iteration)
+    #mobj.rotate(ang_speed * dt)
 
 
 def move_continuous(mobj, direction = right, dt= 0.1, lin_speed = 3):
@@ -28,8 +33,13 @@ def move_continuous(mobj, direction = right, dt= 0.1, lin_speed = 3):
         mobj.move_to(x - lin_speed * dt, y)
 
 
-def scale_continous(mobj, dt = 0.1, scale_speed = 0.3):
-    mobj.scale(1 + scale_speed * dt)
+def scale_continous(mobj, dt = 0.1, scale_speed = 0.3, iteration = 0):
+    if not mobj.scale_caracteristic:
+        mobj.scale(1 + scale_speed * dt * iteration)
+    else:
+        factor = mobj.original_caracteristic / mobj.scale_caracteristic
+        mobj.scale(factor)
+        mobj.scale(1 + scale_speed * dt * iteration)
 
 
 def oscillate_continous(mobj, dt = 0.1, direction = right, frequency = 2, amplitude = 1): 
