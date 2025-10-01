@@ -49,57 +49,121 @@ class Renderer:
                     'output.mp4'
                 ]
                             
-    def render_vm(self, vmobject: mbj.VMobject):
+    def render_polygone(self,mobject ):
+        if mobject.points.shape[0] == 0:
+            return#no points to draw
+        #drawing succesion of points
+        points = mobject.points
+        for i in range(len(points)):
+            if not i:
+                self.ctx.move_to(*points[0])
+            else:
+                self.ctx.line_to(*points[i])
+        self.ctx.line_to(*points[0])
+        #fill options
+        self.ctx.set_source_rgb(mobject.fill_color[0],mobject.fill_color[1],
+                           mobject.fill_color[2])#fill_color
+        self.ctx.fill_preserve()#fill but keep the path
+        self.ctx.set_source_rgb(mobject.stroke_color[0],mobject.stroke_color[1],
+                           mobject.stroke_color[2])
+        self.ctx.set_line_width(2)
+        self.ctx.stroke()
+    #if it is  a vmobject
+    def render_vm(self,vmobject : mbj.VMobject):
+        
+        if isinstance(vmobject, mbj.Text):
+            
+
+            ctx = self.ctx
+       
+       
+            # If we have no pre-rendered surface, generate it now.
+            # Choose target_pixel_width: for example text_obj.font_size * scale_factor
+            if not hasattr(vmobject, "_surface") or vmobject._surface is None:
+                # choose a width roughly proportional to font_size
+                approx_w = int(vmobject.font_size * 40)  # tweak this factor as needed
+                vmobject.generate_points_latex(target_pixel_width=approx_w)
+
+            surf = vmobject._surface
+            if surf is None:
+                return
+
+            # Positioning:
+            # We treat text_obj.position as center by default. If you want top-left, change accordingly.
+            x_center, y_center = vmobject.position
+
+            # If your cairo coordinate origin is top-left (usual), and you want the surface centered:
+            x = x_center - surf.get_width() / 2
+            y = y_center - surf.get_height() / 2
+            print(f"Rendering text at ({x}, {y}) with size ({surf.get_width()}x{surf.get_height()})")
+
+            ctx.save()
+            # if you need to flip y or scale, do it here. For usual top-left coords, no flip.
+            # draw surface
+            ctx.set_source_surface(surf, x, y)
+            ctx.paint()   # paint with full alpha
+            ctx.restore()
+            return
+        
         if not vmobject.submobjects:
             if not vmobject.subpaths:
                 if vmobject.points.shape[0] == 0:
-                    return  # nothing to draw
-
-                pts = vmobject.points
+                    return#no points to draw
                 self.ctx.new_path()
-                self.ctx.move_to(*pts[0])
-                for p in pts[1:]:
-                    self.ctx.line_to(*p)
-
-                if vmobject.closed:
-                    self.ctx.close_path()
-                    # fill first
-                    r, g, b = vmobject.fill_color
-                    self.ctx.set_source_rgba(r, g, b, vmobject.fill_opacity)
-                    self.ctx.fill_preserve()
+                points = vmobject.points
+                for i in range(len(points)):
+                    if not i:
+                        self.ctx.move_to(*points[0])
+                    else:
+                      
+                        self.ctx.line_to(*points[i])
+                      
+                if vmobject.close:
+                    self.ctx.line_to(*points[0])
                 
-                # stroke outline
-                r, g, b = vmobject.stroke_color
-                self.ctx.set_source_rgba(r, g, b, vmobject.stroke_opacity)
-                self.ctx.set_line_width(vmobject.stroke_width)
+                #fill options
+                r,g,b = vmobject.fill_color.get_rgb()
+                    
+                self.ctx.set_source_rgba(r,g,b,vmobject.opacity)
+                self.ctx.fill_preserve()
+                r,g,b = vmobject.stroke_color.get_rgb() 
+                self.ctx.set_source_rgba(r,g,b,vmobject.opacity)
+                #stroke options 
+                
+              
                 self.ctx.stroke()
-
             else:
                 for i, subpath in enumerate(vmobject.subpaths):
                     if subpath.shape[0] == 0:
-                        continue
-
+                        continue#no points to draw
                     self.ctx.new_path()
-                    self.ctx.move_to(*subpath[0])
-                    for p in subpath[1:]:
-                        self.ctx.line_to(*p)
-
+                    points = subpath
+                    for j in range(len(points)):
+                        if not j:
+                            self.ctx.move_to(*points[0])
+                        else:
+                             self.ctx.line_to(*points[j])
                     if vmobject.closed_subpaths[i]:
-                        self.ctx.close_path()
-                        r, g, b = vmobject.fill_color
-                        """ print("DEBUG FILL COLOR:", r, g, b, "opacity=", vmobject.fill_opacity) """
-                        self.ctx.set_source_rgba(r, g, b, vmobject.fill_opacity)
-                        self.ctx.fill_preserve()
+                        self.ctx.line_to(*points[0])
+                r,g,b = vmobject.fill_color.get_rgb()
+                
+                self.ctx.set_source_rgba(r,g,b,vmobject.opacity)
+                self.ctx.fill_preserve()
 
-                    r, g, b = vmobject.stroke_color
-                    self.ctx.set_source_rgba(r, g, b, vmobject.stroke_opacity)
-                    self.ctx.set_line_width(vmobject.stroke_width)
-                    self.ctx.stroke()
+                r,g,b = vmobject.stroke_color.get_rgb()
+                self.ctx.set_source_rgba(r,g,b,vmobject.opacity)
+                self.ctx.set_line_width(1)
+                self.ctx.stroke()
+                   
+                    
+                       
         else:
-            for sm in vmobject.submobjects:
-                if isinstance(sm, mbj.VMobject):
-                    self.render_vm(sm)
-
+            for submobject in vmobject.submobjects:
+                if isinstance(submobject,mbj.VMobject):
+                    self.render_vm(submobject)
+                else:
+                    continue
+      
     def render_arrow2d(self,arrow : mbj.Arrow2d):
         end_point = arrow.offset + arrow.tip
         tip = arrow.tip
@@ -117,15 +181,6 @@ class Renderer:
         triangle.set_fill_color((1, 0, 0))
         triangle.stroke_color = (1,0,0) 
 
-        self.render_vm(triangle)
-    def render_text(self, text_obj) :
-        ctx = self.ctx
-        ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-        ctx.set_font_size(text_obj.font_size)
-        ctx.set_source_rgb(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2])
-        x, y = text_obj.position 
-        ctx.move_to(x, y)
-        ctx.show_text(text_obj.text)
     def render_line(self,line : mbj.Line):
         """
         Render a line object using Cairo
@@ -141,52 +196,69 @@ class Renderer:
         frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR) #convert cairo to opencv
         if main_save:
             cv2.imwrite(f"{out_name}/frame_{frame_index}.png",frame)
-
         self.video_writer.write(frame)  
     def close_video(self):
         if self.video_writer:
             self.video_writer.release()
             print("video saved succesfully")
-    def render_text(self,text_obj:mbj.VMobject):
+    def render_text(self,text_obj:mbj.Text,cairo_format = cairo.FORMAT_ARGB32,WIDTH=WIDTH,HEIGHT=HEIGHT):
         """
         Render text object using Cairo
         """
-        if text_obj.opacity is not None and text_obj.opacity < 1.0:
+        if not text_obj.use_latex:
+            if text_obj.opacity is not None and text_obj.opacity < 1.0:
            
-            ctx = self.ctx
-            ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-            ctx.set_font_size(text_obj.font_size)
-            ctx.set_source_rgba(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2], text_obj.opacity)
-            x, y = text_obj.position 
-            extents = ctx.font_extents()
-            y = y + extents[0]  # Adjust y position for baseline
-            ctx.move_to(x, y)
-            ctx.show_text(text_obj.text)
-        else:
-            ctx = self.ctx
-            ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
-            ctx.set_font_size(text_obj.font_size)
-            ctx.set_source_rgb(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2])
-            x, y = text_obj.position 
-            extents = ctx.font_extents()
-            y = y + extents[0] # Adjust y position for baseline
-            ctx.move_to(x, y)
-            ctx.show_text(text_obj.text)
+                ctx = self.ctx
+                ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+                ctx.set_font_size(text_obj.font_size)
+                ctx.set_source_rgba(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2], text_obj.opacity)
+                x, y = text_obj.position 
+                extents = ctx.font_extents()
+                y = y + extents[0]  # Adjust y position for baseline
+                ctx.move_to(x, y)
+                ctx.show_text(text_obj.text)
+            else:
+                ctx = self.ctx
+                ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+                ctx.set_font_size(text_obj.font_size)
+                ctx.set_source_rgb(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2])
+                x, y = text_obj.position 
+                extents = ctx.font_extents()
+                y = y + extents[0] # Adjust y position for baseline
+                ctx.move_to(x, y)
+                ctx.show_text(text_obj.text)
 
-    def render(self, mobject):
-        """
-        Render a mobject using the appropriate method based on its type.
-        """
-        if isinstance(mobject, mbj.VMobject):
-            self.render_vm(mobject)
-        elif isinstance(mobject, mbj.Arrow2d):
-            self.render_arrow2d(mobject)
-        elif isinstance(mobject, mbj.Text):
-            self.render_text(mobject)
-        elif isinstance(mobject, mbj.Line):
-            self.render_line(mobject)
         else:
-            self.render_polygone(mobject)
+            ctx = self.ctx
+            ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
+            ctx.set_font_size(text_obj.font_size)
+            if text_obj.opacity is not None and text_obj.opacity < 1.0:
+                ctx.set_source_rgba(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2], text_obj.opacity)
+            else:
+                ctx.set_source_rgb(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2])
+            
+           
+            # Generate LaTeX points once
+            text_obj.generate_points_latex()
+
+            text_obj.closed_subpaths = [True] * len(text_obj.subpaths)  # Ensure all subpaths are closed
+            
+          
+            temp_surface = cairo.ImageSurface(cairo_format, WIDTH, HEIGHT)
+            
+           
+            temp_ctx = cairo.Context(temp_surface)
+            temp_ctx.set_source_rgba(1, 1, 1, 0)  # transparent background
+            temp_ctx.paint()
+
+
+            renderer.ctx = temp_ctx
+            renderer.render_vm(text_obj)  # draw text once
+            renderer.ctx = ctx  # restore main context
+            text_obj.temp_surface = temp_surface
+            print("Temporary surface created for LaTeX rendering.")
+
+
 
 
 class Scene:

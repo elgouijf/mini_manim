@@ -4,6 +4,15 @@ from math import cos, sin, tan, pi
 from utilities.bezier import *
 import inspect
 import cairo
+from matplotlib import mathtext
+from matplotlib.font_manager import FontProperties
+import os#to interact with the operating system (like file paths)
+import subprocess#lets us call external programs (like latex, dvisvgm)
+import tempfile#to create temporary files
+import xml.etree.ElementTree as ET#to parse svg files
+import re
+import cairosvg
+import io
 from copy import deepcopy
 from utilities.color import *
 
@@ -727,6 +736,16 @@ class Circle(VMobject):
             T0 = np.array([-np.sin(start_angle), np.cos(start_angle)], dtype=np.float64)
             T1 = np.array([-np.sin(end_angle), np.cos(end_angle)], dtype=np.float64)
 
+            # Compute control points
+            p1 = p0 + kappa*T0/np.linalg.norm(T0) #we're sure that the direction will never be 0 because it's a circle
+            p2 = p3 - kappa*T1/np.linalg.norm(T1)
+
+            for t in np.linspace(0, 1, n_bezier_points):
+                point = bezier_cubic(t, p0, p1, p2, p3)
+                circle.append(point + center)
+        
+            self.add_subpaths(circle, closed=True)
+
             # control points
             p1 = p0 + kappa * T0 * radius
             p2 = p3 - kappa * T1 * radius
@@ -801,9 +820,9 @@ class Polygon(VMobject):
         self.set_corners(corners)
 
 
-class Text(Mobject) :
+class Text(VMobject) :
     """" Text Class """
-    def __init__(self, text, position, font_size, color) :
+    def __init__(self, text, position, font_size, color,ctx = None,use_latex = False,surface =None,temp_surface = None):
         # call the __init__ method of the Mobject class (superclass)
         super().__init__()      
         self.text = text            # a string : the text we want to show
@@ -812,7 +831,11 @@ class Text(Mobject) :
         self.font_size = font_size
         self.text_color = color     # a triplet (r,g,b)
         self.opacity = 1.0             # opacity of the text
-
+        self.use_latex = use_latex
+        self.normalize_scale = 1
+        self.surface = surface # the cairo surface we will use to render the text
+        self.ctx = ctx              # the cairo context we will use to generate the points of the text
+        self.temp_surface = temp_surface # a temporary surface to use if we want to render latex text
     def generate_points(self):
         """ Generates the points of the text using the context's text_path method """
         ctx = self.ctx
@@ -865,3 +888,60 @@ class Text(Mobject) :
         self.subpaths = sub_paths
         # Combine all subpaths into a single array of points
         self.set_points(np.vstack(sub_paths))  # Set the points of the text
+    def generate_points_latex(self, target_pixel_width=200):
+        """
+        Render self.text (LaTeX) to a cairo.ImageSurface using dvisvgm + cairosvg.
+        target_pixel_width: optional integer. If provided, CairoSVG will rasterize
+                            to approximately this width (in pixels). If None, default.
+        Result surfaces are stored as:
+            self._surface (cairo.ImageSurface)
+            self._surface_w, self._surface_h (ints)
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            tex_file = os.path.join(tmp, "temp.tex")
+            dvi_file = os.path.join(tmp, "temp.dvi")
+            svg_file = os.path.join(tmp, "temp.svg")
+
+            tex_source = r"""\documentclass{standalone}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\begin{document}
+%s
+\end{document}
+""" % self.text
+
+            with open(tex_file, "w", encoding="utf-8") as f:
+                f.write(tex_source)
+
+            # 1) latex -> .dvi
+            subprocess.run(
+                ["latex", "-interaction=nonstopmode", "-output-directory", tmp, tex_file],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+            # 2) dvi -> svg
+            subprocess.run(
+                ["dvisvgm", "-n", "-o", svg_file, dvi_file],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+            # 3) rasterize svg -> png bytes (CairoSVG). You may set output_width to target_pixel_width
+            cairosvg_kwargs = {}
+            if target_pixel_width is not None:
+                cairosvg_kwargs["output_width"] = int(target_pixel_width)
+            # preserve transparency:
+            png_bytes = cairosvg.svg2png(url=svg_file, write_to=None, **cairosvg_kwargs)
+
+            # 4) create a cairo ImageSurface from PNG bytes
+            bio = io.BytesIO(png_bytes)
+            surface = cairo.ImageSurface.create_from_png(bio)
+
+            # store on object
+            self._surface = surface
+            self._surface_w = surface.get_width()
+            self._surface_h = surface.get_height()
+
+            # (optional) compute anchor/center info for convenience
+            # We'll treat self.position as the center by default below.
+            return self._surface, self._surface_w, self._surface_h
