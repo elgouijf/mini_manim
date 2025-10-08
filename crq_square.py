@@ -26,10 +26,13 @@ class ClearScreenScene(Scene):
 class CircleToSquare(ClearScreenScene):
     def construct(self):
         # Create a larger circle and square centered on screen
-        circle = Circle(radius=100.0, center=np.array([WIDTH/2, HEIGHT/2]))
+        circle1 = Circle(radius=100.0, center=np.array([WIDTH/2, HEIGHT/2]))
+        circle2 = Circle(radius=100.0, center=np.array([WIDTH/2, HEIGHT/2]), fill_opacity = 0, stroke_color = RED)
         polygone = Polygon(radius=100, center=np.array([WIDTH/2, HEIGHT/2]), n =8)
         square = Square(side_len=200.0, center=np.array([WIDTH/2, HEIGHT/2]))
         triangle = Polygon(radius=100, center=np.array([WIDTH/2, HEIGHT/2]), n=3)
+        center = triangle.get_center()
+        print(center)
 
         polygones = []
         for i in range(1,9):
@@ -37,8 +40,8 @@ class CircleToSquare(ClearScreenScene):
             polygones.append(poly)
 
         # Explicitly set colors
-        circle.set_fill_color((0, 0, 0))   # blue fill
-        circle.stroke_color = (0, 0, 1)    # blue stroke
+        circle1.set_fill_color((0, 0, 0))   # blue fill
+        circle1.stroke_color = (0, 0, 1)    # blue stroke
         polygone.set_fill_color((0, 1, 0))   # red fill
         polygone.stroke_color = (0, 1, 0)    # red stroke
         square.set_fill_color((0, 0, 0))   # red fill
@@ -55,11 +58,12 @@ class CircleToSquare(ClearScreenScene):
         """ self.play(Rotate(circle, pi/4)) """
         self.add(square)
         self.wait(0.05)
+        self.add(circle2)
         self.play(Rotate(square, pi/4))
         self.wait(0.05)
         self.wait(0.05)
         self.play(Rotate(square, -pi/4))
-        self.play(Transform(square, circle))
+        self.play(Transform(square, circle1))
         self.wait(0.05)
         self.play(Transform(square, polygone))
         self.wait(0.05)

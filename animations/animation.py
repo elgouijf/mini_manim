@@ -82,23 +82,34 @@ class Scale(Animation):
 
 
 class Rotate(Animation):
-    def __init__(self, mobject, theta, start_time= 0, rate_time=1, rate_function=smooth):
+    def __init__(self, mobject, theta, center=None, start_time=0, rate_time=1, rate_function=smooth):
         super().__init__(mobject, start_time, rate_time, rate_function)
         self.angle = theta
         self.prev_angle = 0
+        # If no center given, mark that we should use the mobject’s center dynamically
+        self.use_mobject_center = (center is None)
+        # Store the fixed center if provided (None if dynamic)
+        self.center = center
 
     def interpolate(self, t):
+        # Compute incremental rotation angle
         f_t = self.rate(t)
         current_angle = self.angle * f_t
         delta = current_angle - self.prev_angle
-        """ print("Frame", t, "mobject points:", self.mobject.points.shape) """
 
-        """ self.mobject.set_points(self.starting_mobject.points) """
-        self.mobject.rotate(delta)
+        # Determine rotation center: dynamic or fixed
+        if self.use_mobject_center:
+            center = self.mobject.get_center()
+        else:
+            center = self.center
+
+        # Rotate the mobject by the incremental angle about the chosen center
+        self.mobject.rotate(delta, center)
         self.prev_angle = current_angle
 
     def finish(self):
         self.interpolate(1)
+
 
     
 class Fade(Animation):
@@ -134,6 +145,13 @@ class FadeOut(Fade):
 
 
 class ColorChange(Animation):
+    def __new__(cls, mobject, *args, **kwargs):
+        if hasattr(mobject, "is_group") and mobject.is_group:
+            return ColorChange_group(mobject, *args, **kwargs)
+        else:
+            # Since Animation has no __new__ method object.__new
+            return super().__new__(cls)
+        
     def __init__(self, mobject, target_fill_color = PURPLE, target_stroke_color= PURPLE, start_time=0, rate_time=1, rate_function=smooth):
         super().__init__(mobject, start_time, rate_time, rate_function)
         self.starting_fill_color = self.mobject.fill_color
@@ -141,12 +159,11 @@ class ColorChange(Animation):
         self.starting_stroke_color = self.mobject.stroke_color
         self.target_stroke_color = target_stroke_color
         # maintain the same opacity as before
-        
+    
         
 
     def interpolate(self, t):
         f_t = self.rate(t)
-
         new_fill_color = interpolate_colors(self.starting_fill_color, self.target_fill_color, f_t)
         self.mobject.set_fill_color(new_fill_color)
         print(self.mobject.fill_color)
@@ -158,3 +175,19 @@ class ColorChange(Animation):
     def finish(self):
         self.interpolate(1)
 
+
+class ColorChange_group(Animation):
+    def __init__(self, mobject, target_fill_color=PURPLE, target_stroke_color=PURPLE, start_time=0, rate_time=1, rate_function=smooth):
+        super().__init__(mobject, start_time, rate_time, rate_function)
+        self.sub_animations = [
+            ColorChange(sub, target_fill_color, target_stroke_color, start_time, rate_time, rate_function)
+            for sub in mobject.submobjects
+        ]
+
+    def interpolate(self, t):
+        for anim in self.sub_animations:
+            anim.interpolate(t)
+
+    def finish(self):
+        for anim in self.sub_animations:
+            anim.finish()

@@ -6,14 +6,11 @@ down = "down"
 right = "right"
 left = "left"
 
-def rotate_continuous(mobj,  dt = 0.1, ang_speed = np.pi/4, iteration = 0):
-    """ ang_speed = #angle per second """
-    if not mobj.rotated:
-        mobj.rotate(ang_speed * dt * iteration)
-    else:
-        mobj.rotate(-(ang_speed * dt * (iteration - 1)))
-        mobj.rotate(ang_speed * dt * iteration)
-    #mobj.rotate(ang_speed * dt)
+def rotate_continuous(mobj, dt=0.1, ang_speed=np.pi/4, center = None, **kwargs):
+    """Rotate mobj continuously with angular speed (radians/sec)."""
+    if center is None:
+        center = mobj.get_center()
+    mobj.rotate(ang_speed * dt, center)
 
 
 def move_continuous(mobj, direction = right, dt= 0.1, lin_speed = 3):

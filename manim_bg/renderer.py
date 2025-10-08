@@ -118,19 +118,16 @@ class Renderer:
                       
                         self.ctx.line_to(*points[i])
                       
-                if vmobject.close:
+                if vmobject.closed:
                     self.ctx.line_to(*points[0])
                 
                 #fill options
-                r,g,b = vmobject.fill_color.get_rgb()
-                    
-                self.ctx.set_source_rgba(r,g,b,vmobject.opacity)
+                r,g,b = vmobject.fill_color
+                self.ctx.set_source_rgba(r,g,b,vmobject.fill_opacity)
                 self.ctx.fill_preserve()
-                r,g,b = vmobject.stroke_color.get_rgb() 
-                self.ctx.set_source_rgba(r,g,b,vmobject.opacity)
                 #stroke options 
-                
-              
+                r,g,b = vmobject.stroke_color
+                self.ctx.set_source_rgba(r,g,b,vmobject.stroke_opacity)
                 self.ctx.stroke()
             else:
                 for i, subpath in enumerate(vmobject.subpaths):
@@ -258,7 +255,21 @@ class Renderer:
             text_obj.temp_surface = temp_surface
             print("Temporary surface created for LaTeX rendering.")
 
+    def render(self, mobject):
 
+        """
+        Render a mobject using the appropriate method based on its type.
+        """
+        if isinstance(mobject, mbj.VMobject):
+            self.render_vm(mobject)
+        elif isinstance(mobject, mbj.Arrow2d):
+            self.render_arrow2d(mobject)
+        elif isinstance(mobject, mbj.Text):
+            self.render_text(mobject)
+        elif isinstance(mobject, mbj.Line):
+            self.render_line(mobject)
+        else:
+            self.render_polygone(mobject)
 
 
 class Scene:
