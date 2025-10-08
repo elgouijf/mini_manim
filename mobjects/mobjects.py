@@ -4,15 +4,6 @@ from math import cos, sin, tan, pi
 from utilities.bezier import *
 import inspect
 import cairo
-from matplotlib import mathtext
-from matplotlib.font_manager import FontProperties
-import os#to interact with the operating system (like file paths)
-import subprocess#lets us call external programs (like latex, dvisvgm)
-import tempfile#to create temporary files
-import xml.etree.ElementTree as ET#to parse svg files
-import re
-import cairosvg
-import io
 from copy import deepcopy
 from utilities.color import *
 
@@ -70,8 +61,17 @@ class Mobject:
         self.points = (1 - t)*mob1.points + t*mob2.points 
 
     def get_center(self):
-        return np.mean(self.points, axis = 0) # axis = 0 => mean over columns
+        if self.points is None or self.points.size == 0:
+            return np.array([0.0, 0.0])
     
+        pts = self.points
+        if not np.allclose(self.transform_matrix, np.identity(3)):
+            ones = np.ones((pts.shape[0], 1))
+            pts_h = np.hstack([pts, ones])
+            transformed = (self.transform_matrix @ pts_h.T).T[:, :2]
+            return np.mean(transformed, axis=0)
+        return np.mean(pts, axis=0)
+
     def get_translation_matrix(self, dx, dy):
         return np.array([
                 [1, 0, dx],
@@ -127,9 +127,10 @@ class Mobject:
         else:
             self.scale_caracteristic *= s
 
-    def rotate(self, theta):
-
-        center = self.get_center()
+    def rotate(self, theta, center = None):
+        print("Rotating mobject")
+        if center is None:
+            center = self.get_center()
         T1 = self.get_translation_matrix(*(-center)) # This grants us a shift-back to the origin before rotating
 
         R = np.array([[np.cos(theta), -np.sin(theta), 0],
@@ -140,6 +141,7 @@ class Mobject:
         rotation_matrix = T2 @ R@ T1
         self.transform_matrix = rotation_matrix @ self.transform_matrix
         self.rotated = True
+
 
 
     def apply_transform(self):
@@ -226,6 +228,8 @@ class Group(Mobject):
         super().__init__(**settings) # Group being a subclass of Mobject it'll have the same attributes intialzation
         self.submobjects = list(mobjects)
         self.refresh_points()  # Refresh points after adding mobjects
+        self.initial_center = self.get_center()
+        self.is_group = True
 
     
     def is_empty(self):
@@ -255,24 +259,46 @@ class Group(Mobject):
         return np.mean(points, axis=0)
     
     def move_to(self, x, y):
-        Mobject.move_to(self, x, y)
+        # Move the entire group by computing the offset and applying to each child.
+        center = self.get_center()
+        dx = x - center[0]
+        dy = y - center[1]
         for mobj in self.submobjects:
-            mobj.move_to(x, y)
+            # Compute new center for each child and move it there
+            child_center = mobj.get_center()
+            new_x = child_center[0] + dx
+            new_y = child_center[1] + dy
+            mobj.move_to(new_x, new_y)
+            mobj.apply_transform()  # immediately apply the transform to update points
         self.refresh_points()
-        
 
+    
     def scale(self, s):
+        # Scale the entire group around its center.
+        group_center = self.get_center()
         for mobj in self.submobjects:
+            child_center = mobj.get_center()
+            # 1) Scale child around its own center
             mobj.scale(s)
+            mobj.apply_transform()
+            # 2) Reposition child so that it appears scaled about the group center
+            new_center = group_center + s * (child_center - group_center)
+            mobj.move_to(new_center[0], new_center[1])
+            mobj.apply_transform()
         self.refresh_points()
 
 
-    def rotate(self, theta):
-        Mobject.rotate(self, theta)
-        for mobj in self.submobjects:
-            mobj.rotate(theta)
-        self.refresh_points
 
+    def rotate(self, theta, center = None):
+        print("Rotating group")
+        if center is None:
+            center = self.get_center()
+        
+        for mobj in self.submobjects:
+            mobj.rotate(theta, center)
+        self.rotated = True
+        self.refresh_points()
+       
 
     def set_fill_opacity(self, opacity):
         for mobj in self.submobjects:
@@ -283,12 +309,12 @@ class Group(Mobject):
             mobj.set_stroke_opacity(opacity)
 
     def set_fill_color(self, color):
-        Mobject.set_fill_color(self, color)
+        Mobject.set_stroke_color(self, color)
         for mobj in self.submobjects:
             mobj.set_fill_color(color)
     
     def set_stroke_color(self, color):
-        Mobject.set_stroke_color(self,color)
+        Mobject.set_stroke_color(self, color)
         for mobj in self.submobjects:
             mobj.set_stroke_color(color)
 
@@ -303,10 +329,6 @@ class Group(Mobject):
         return self
 
 
-    def add_updater(self, update_func):
-        """ Adds an updater to all submobjects in the group """
-        for mobj in self.submobjects:
-            mobj.add_updater(update_func)
     
     def remove_updater(self, update_func):
         """ Removes an updater from all submobjects in the group """
@@ -316,15 +338,30 @@ class Group(Mobject):
 
     def run_updates(self, *args, **kwargs):
         """ Runs all the updaters in the order they were added for all submobjects """
-        for mobj in self.submobjects:
-            mobj.run_updates(*args, **kwargs)
-        self.refresh_points()
+        print("in group")
+        for updater in self.updaters:
+            print("updaters in group")
+            signature = inspect.signature(updater)
+            bound_args = {}
+            # Always pass self as the first argument
+            bound_args['mobj'] = self
+            for name, param in signature.parameters.items():
+                if name == 'mobj':
+                    continue
+                if name in kwargs:
+                    bound_args[name] = kwargs[name]
+                elif param.default is not param.empty:
+                    bound_args[name] = param.default
+                # else: leave missing, will raise error if required
+            print("calling updater")
+            updater(**bound_args)
+        self.apply_transform() # apply the transformation after all updaters have been run
 
         
     def apply_transform(self):
         for mobj in self.submobjects:
             mobj.transform_matrix = self.transform_matrix @ mobj.transform_matrix
-            mobj.apply_transofrm()
+            mobj.apply_transform()
         # Refresh points after applying transformations
         self.refresh_points()  
         # reset transform matrix
@@ -417,9 +454,9 @@ class VGroup(Group, VMobject): # Group must come first for methods to follow MRO
 
     def run_updates(self, *args, **kwargs):
         """ Runs all the updaters in the order they were added for all submobjects """
-        for vmobj in self.submobjects:
-            vmobj.run_updates(*args, **kwargs)
-        self.refresh_points()
+        print(" running vgroup updates")
+        Group.run_updates(self, *args, **kwargs)
+        print(" came back from group")
         self.refresh_subpaths()  # Refresh subpaths after running updates
 
     def apply_transform(self):
@@ -439,6 +476,16 @@ class VGroup(Group, VMobject): # Group must come first for methods to follow MRO
         Group.set_fill_color(self, color)
 
     def scale(self,s):
+        Group.scale(self, s)
+    
+    def rotate(self, theta, center = None):
+        print("Rotating VGROUP")
+        Group.rotate(self, theta, center)
+
+    def move_to(self, x, y):
+        Group.move_to(self, x, y)
+    
+    def scale(self, s):
         Group.scale(self, s)
 
 
@@ -736,16 +783,6 @@ class Circle(VMobject):
             T0 = np.array([-np.sin(start_angle), np.cos(start_angle)], dtype=np.float64)
             T1 = np.array([-np.sin(end_angle), np.cos(end_angle)], dtype=np.float64)
 
-            # Compute control points
-            p1 = p0 + kappa*T0/np.linalg.norm(T0) #we're sure that the direction will never be 0 because it's a circle
-            p2 = p3 - kappa*T1/np.linalg.norm(T1)
-
-            for t in np.linspace(0, 1, n_bezier_points):
-                point = bezier_cubic(t, p0, p1, p2, p3)
-                circle.append(point + center)
-        
-            self.add_subpaths(circle, closed=True)
-
             # control points
             p1 = p0 + kappa * T0 * radius
             p2 = p3 - kappa * T1 * radius
@@ -772,7 +809,7 @@ class Square(VMobject):
         self.original_caracteristic = side_len
 
     
-    def generate_square(self, center, side_len = 2.0,n_points = None):
+    def generate_square(self, center, side_len = 2.0, n_points = None):
         half = side_len/2
         # Define corners
         corners = [
@@ -790,39 +827,54 @@ class Square(VMobject):
                 end = corners[(i + 1) % 4]
                 for t in np.linspace(0, 1, points_per_edge, endpoint=(i==3)):
                     all_points.append((1-t)*start + t*end)
-            all_points.append(all_points[0])  # close path
+            self.close()  # close path
             self.set_corners(np.array(all_points))
         else:
-            corners.append(corners[0])  # close path
+            self.close()  # close path
             self.set_corners(corners)
 
 
 class Polygon(VMobject):
-    def __init__(self, center=np.array([0,0]), radius = 2.0, n = 8 , **settings):
+    def __init__(self, center, radius = 2.0, n = 8 , **settings):
         super().__init__(**settings)
         self.close()
         self.generate_polygon(center, n, radius)
         self.pre_state = deepcopy(self.points)
         self.original_caracteristic = radius
+        self.close()
+
         
     def generate_polygon(self, center, n, radius):
-        corners = [np.array([0.0, float(radius)])]
-        theta = 2*pi/n
-        Rotation = np.array([[np.cos(theta), -np.sin(theta)],
-                                    [np.sin(theta), np.cos(theta)],])
-        
-        for i in range(1, n):
-            corners.append(Rotation @ corners[i - 1])
-        
-        for i in range(len(corners)):
-            corners[i] += center
+        """
+        Generate a regular n-gon centered at `center` using rotation matrices.
+        The first vertex starts at (0, radius) relative to the center.
+        """
+        theta = 2 * np.pi / n
+        half_angle = np.pi / 2  # first vertex is "up"
+
+        # Build the rotation matrix once
+        R = np.array([
+            [np.cos(theta), -np.sin(theta)],
+            [np.sin(theta),  np.cos(theta)]
+        ], dtype=float)
+
+        # Start from the "top" point
+        first = np.array([0.0, radius])
+        corners = [first.copy()]
+
+        # Successively rotate the previous vertex
+        for _ in range(1, n):
+            next_corner = R @ corners[-1]
+            corners.append(next_corner)
+
+        # Shift all corners by center
+        corners = [corner + center for corner in corners]
 
         self.set_corners(corners)
 
-
-class Text(VMobject) :
+class Text(Mobject) :
     """" Text Class """
-    def __init__(self, text, position, font_size, color,ctx = None,use_latex = False,surface =None,temp_surface = None):
+    def __init__(self, text, position, font_size, color) :
         # call the __init__ method of the Mobject class (superclass)
         super().__init__()      
         self.text = text            # a string : the text we want to show
@@ -831,11 +883,7 @@ class Text(VMobject) :
         self.font_size = font_size
         self.text_color = color     # a triplet (r,g,b)
         self.opacity = 1.0             # opacity of the text
-        self.use_latex = use_latex
-        self.normalize_scale = 1
-        self.surface = surface # the cairo surface we will use to render the text
-        self.ctx = ctx              # the cairo context we will use to generate the points of the text
-        self.temp_surface = temp_surface # a temporary surface to use if we want to render latex text
+
     def generate_points(self):
         """ Generates the points of the text using the context's text_path method """
         ctx = self.ctx
@@ -888,60 +936,3 @@ class Text(VMobject) :
         self.subpaths = sub_paths
         # Combine all subpaths into a single array of points
         self.set_points(np.vstack(sub_paths))  # Set the points of the text
-    def generate_points_latex(self, target_pixel_width=200):
-        """
-        Render self.text (LaTeX) to a cairo.ImageSurface using dvisvgm + cairosvg.
-        target_pixel_width: optional integer. If provided, CairoSVG will rasterize
-                            to approximately this width (in pixels). If None, default.
-        Result surfaces are stored as:
-            self._surface (cairo.ImageSurface)
-            self._surface_w, self._surface_h (ints)
-        """
-        with tempfile.TemporaryDirectory() as tmp:
-            tex_file = os.path.join(tmp, "temp.tex")
-            dvi_file = os.path.join(tmp, "temp.dvi")
-            svg_file = os.path.join(tmp, "temp.svg")
-
-            tex_source = r"""\documentclass{standalone}
-\usepackage{amsmath}
-\usepackage{amssymb}
-\usepackage{mathrsfs}
-\begin{document}
-%s
-\end{document}
-""" % self.text
-
-            with open(tex_file, "w", encoding="utf-8") as f:
-                f.write(tex_source)
-
-            # 1) latex -> .dvi
-            subprocess.run(
-                ["latex", "-interaction=nonstopmode", "-output-directory", tmp, tex_file],
-                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-
-            # 2) dvi -> svg
-            subprocess.run(
-                ["dvisvgm", "-n", "-o", svg_file, dvi_file],
-                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
-            )
-
-            # 3) rasterize svg -> png bytes (CairoSVG). You may set output_width to target_pixel_width
-            cairosvg_kwargs = {}
-            if target_pixel_width is not None:
-                cairosvg_kwargs["output_width"] = int(target_pixel_width)
-            # preserve transparency:
-            png_bytes = cairosvg.svg2png(url=svg_file, write_to=None, **cairosvg_kwargs)
-
-            # 4) create a cairo ImageSurface from PNG bytes
-            bio = io.BytesIO(png_bytes)
-            surface = cairo.ImageSurface.create_from_png(bio)
-
-            # store on object
-            self._surface = surface
-            self._surface_w = surface.get_width()
-            self._surface_h = surface.get_height()
-
-            # (optional) compute anchor/center info for convenience
-            # We'll treat self.position as the center by default below.
-            return self._surface, self._surface_w, self._surface_h
