@@ -73,10 +73,13 @@ class Renderer:
         
         if isinstance(vmobject, mbj.Text):
             
+           
+
+           
 
             ctx = self.ctx
-       
-       
+      
+
             # If we have no pre-rendered surface, generate it now.
             # Choose target_pixel_width: for example text_obj.font_size * scale_factor
             if not hasattr(vmobject, "_surface") or vmobject._surface is None:
@@ -95,7 +98,7 @@ class Renderer:
             # If your cairo coordinate origin is top-left (usual), and you want the surface centered:
             x = x_center - surf.get_width() / 2
             y = y_center - surf.get_height() / 2
-            print(f"Rendering text at ({x}, {y}) with size ({surf.get_width()}x{surf.get_height()})")
+            
 
             ctx.save()
             # if you need to flip y or scale, do it here. For usual top-left coords, no flip.
@@ -104,8 +107,9 @@ class Renderer:
             ctx.paint()   # paint with full alpha
             ctx.restore()
             return
-        
+     
         if not vmobject.submobjects:
+
             if not vmobject.subpaths:
                 if vmobject.points.shape[0] == 0:
                     return#no points to draw
@@ -115,20 +119,26 @@ class Renderer:
                     if not i:
                         self.ctx.move_to(*points[0])
                     else:
-                      
+                     
+                     
                         self.ctx.line_to(*points[i])
                       
                 if vmobject.closed:
                     self.ctx.line_to(*points[0])
                 
                 #fill options
-                r,g,b = vmobject.fill_color
-                self.ctx.set_source_rgba(r,g,b,vmobject.fill_opacity)
+                r,g,b = vmobject.fill_color.get_rgb()
+                if vmobject.stroke_opacity is not None and vmobject.stroke_opacity < 1.0:    
+                    self.ctx.set_source_rgba(r,g,b,vmobject.stroke_opacity)
                 self.ctx.fill_preserve()
+                r,g,b = vmobject.stroke_color.get_rgb() 
+                self.ctx.set_source_rgba(r,g,b,vmobject.stroke_opacity)
                 #stroke options 
-                r,g,b = vmobject.stroke_color
+                r,g,b = vmobject.stroke_color.get_rgb()
                 self.ctx.set_source_rgba(r,g,b,vmobject.stroke_opacity)
                 self.ctx.stroke()
+                if vmobject.close:
+                    self.ctx.fill_preserve()
             else:
                 for i, subpath in enumerate(vmobject.subpaths):
                     if subpath.shape[0] == 0:
@@ -198,7 +208,7 @@ class Renderer:
         if self.video_writer:
             self.video_writer.release()
             print("video saved succesfully")
-    def render_text(self,text_obj:mbj.Text,cairo_format = cairo.FORMAT_ARGB32,WIDTH=WIDTH,HEIGHT=HEIGHT):
+    def render_text(self,text_obj:mbj.Text,cairo_format = cairo.FORMAT_ARGB32):
         """
         Render text object using Cairo
         """
@@ -208,7 +218,8 @@ class Renderer:
                 ctx = self.ctx
                 ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
                 ctx.set_font_size(text_obj.font_size)
-                ctx.set_source_rgba(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2], text_obj.opacity)
+                r,g,b = text_obj.text_color.get_rgb()
+                ctx.set_source_rgba(r, g , b, text_obj.opacity)
                 x, y = text_obj.position 
                 extents = ctx.font_extents()
                 y = y + extents[0]  # Adjust y position for baseline
@@ -218,7 +229,8 @@ class Renderer:
                 ctx = self.ctx
                 ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
                 ctx.set_font_size(text_obj.font_size)
-                ctx.set_source_rgb(text_obj.text_color[0], text_obj.text_color[1], text_obj.text_color[2])
+                r,g,b = text_obj.text_color.get_rgb()
+                ctx.set_source_rgb(r, g ,b)
                 x, y = text_obj.position 
                 extents = ctx.font_extents()
                 y = y + extents[0] # Adjust y position for baseline
@@ -226,6 +238,9 @@ class Renderer:
                 ctx.show_text(text_obj.text)
 
         else:
+            
+            
+            
             ctx = self.ctx
             ctx.select_font_face(text_obj.font, cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_NORMAL)
             ctx.set_font_size(text_obj.font_size)
@@ -241,7 +256,7 @@ class Renderer:
             text_obj.closed_subpaths = [True] * len(text_obj.subpaths)  # Ensure all subpaths are closed
             
           
-            temp_surface = cairo.ImageSurface(cairo_format, WIDTH, HEIGHT)
+            temp_surface = cairo.ImageSurface(cairo_format, self.width, self.height)
             
            
             temp_ctx = cairo.Context(temp_surface)
@@ -249,11 +264,11 @@ class Renderer:
             temp_ctx.paint()
 
 
-            renderer.ctx = temp_ctx
-            renderer.render_vm(text_obj)  # draw text once
-            renderer.ctx = ctx  # restore main context
+            self.ctx = temp_ctx
+            self.render_vm(text_obj)  # draw text once
+            self.ctx = ctx  # restore main context
             text_obj.temp_surface = temp_surface
-            print("Temporary surface created for LaTeX rendering.")
+            
 
     def render(self, mobject):
 
@@ -397,16 +412,16 @@ def test_vmobject_open_and_closed():
 
 #test_vmobject_open_and_closed()
 
-def test_text() :
-    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, WIDTH, HEIGHT)
-    ctx = cairo.Context(surface)
-    renderer = Renderer(surface, ctx)
-    ctx.set_source_rgb(1,1,1)
-    ctx.paint()
-    text_obj = mbj.Text("Hello, Mini Manim !", (50,50), "Sans", 32, (0.2, 0.2, 0.7))
-    renderer.render_text(text_obj)
-    surface.write_to_png("test_text_output.png")
-    print('Saved to test_text_output.png')
+# def test_text() :
+#     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, WIDTH, HEIGHT)
+#     ctx = cairo.Context(surface)
+#     renderer = Renderer(surface, ctx)
+#     ctx.set_source_rgb(1,1,1)
+#     ctx.paint()
+#     text_obj = mbj.Text("Hello, Mini Manim !", (50,50), "Sans", 32, (0.2, 0.2, 0.7))
+#     renderer.render_text(text_obj)
+#     surface.write_to_png("test_text_output.png")
+#     print('Saved to test_text_output.png')
 
 #test_text()
 WIDTH, HEIGHT, FPS = 640, 360, 30

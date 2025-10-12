@@ -6,7 +6,11 @@ import inspect
 import cairo
 from copy import deepcopy
 from utilities.color import *
-
+import subprocess
+import tempfile
+import os
+import cairosvg
+import io
 def resize_preserving_order(points, new_length):
     """
     Given an array of points, return a new array with exactly new_length points,
@@ -686,15 +690,16 @@ class Line(VMobject):
                 if dy/dx != a:
                     return False
         return True
-    
+  
     def grid(WIDTH, HEIGHT,n_lines_x,n_lines_y):
         """ Returns a grid of lines with the given width and height """
         lines = []
-        for x in np.linspace(0, WIDTH, n_lines_x):
+        for x in np.linspace(WIDTH/n_lines_x, WIDTH, n_lines_x):
             lines.append(Line(np.array([x, 0]), np.array([x, HEIGHT])))
-        for y in np.linspace(0, HEIGHT, n_lines_y):
+        for y in np.linspace(HEIGHT/n_lines_y, HEIGHT, n_lines_y):
             lines.append(Line(np.array([0, y]), np.array([WIDTH, y])))
         return lines
+    
     
     
 class Vector2D(VMobject):
@@ -872,9 +877,9 @@ class Polygon(VMobject):
 
         self.set_corners(corners)
 
-class Text(Mobject) :
+class Text(VMobject) :
     """" Text Class """
-    def __init__(self, text, position, font_size, color) :
+    def __init__(self, text, position, font_size, color,ctx,use_latex = False,surface = None): 
         # call the __init__ method of the Mobject class (superclass)
         super().__init__()      
         self.text = text            # a string : the text we want to show
@@ -883,7 +888,10 @@ class Text(Mobject) :
         self.font_size = font_size
         self.text_color = color     # a triplet (r,g,b)
         self.opacity = 1.0             # opacity of the text
-
+        self.ctx = ctx            # the cairo context
+        self.temp_surface = None  # Placeholder for the rendered surface
+        self.use_latex = use_latex
+        self._surface =  surface  # Placeholder for the rendered surface
     def generate_points(self):
         """ Generates the points of the text using the context's text_path method """
         ctx = self.ctx
@@ -936,3 +944,60 @@ class Text(Mobject) :
         self.subpaths = sub_paths
         # Combine all subpaths into a single array of points
         self.set_points(np.vstack(sub_paths))  # Set the points of the text
+    def generate_points_latex(self):
+        """
+        Render self.text (LaTeX) to a cairo.ImageSurface using dvisvgm + cairosvg.
+        target_pixel_width: optional integer. If provided, CairoSVG will rasterize
+                            to approximately this width (in pixels). If None, default.
+        Result surfaces are stored as:
+            self._surface (cairo.ImageSurface)
+            self._surface_w, self._surface_h (ints)
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            tex_file = os.path.join(tmp, "temp.tex")
+            dvi_file = os.path.join(tmp, "temp.dvi")
+            svg_file = os.path.join(tmp, "temp.svg")
+
+            tex_source = r"""\documentclass[border=0pt]{standalone}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\begin{document}
+%s
+\end{document}
+""" % self.text
+
+            with open(tex_file, "w", encoding="utf-8") as f:
+                f.write(tex_source)
+
+            # 1) latex -> .dvi
+            subprocess.run(
+                ["latex", "-interaction=nonstopmode", "-output-directory", tmp, tex_file],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+            # 2) dvi -> svg
+            subprocess.run(
+                ["dvisvgm", "-n", "-o", svg_file, dvi_file],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            )
+
+            # 3) rasterize svg -> png bytes (CairoSVG). You may set output_width to target_pixel_width
+            cairosvg_kwargs = {}
+            target_pixel_width = self.font_size * len(self.text) * 0.2
+            cairosvg_kwargs["output_width"] = int(target_pixel_width)
+            # preserve transparency:
+            png_bytes = cairosvg.svg2png(url=svg_file, write_to=None, **cairosvg_kwargs)
+
+            # 4) create a cairo ImageSurface from PNG bytes
+            bio = io.BytesIO(png_bytes)
+            surface = cairo.ImageSurface.create_from_png(bio)
+
+            # store on object
+            self._surface = surface
+            self._surface_w = surface.get_width()
+            self._surface_h = surface.get_height()
+
+            # (optional) compute anchor/center info for convenience
+            # We'll treat self.position as the center by default below.
+            return self._surface, self._surface_w, self._surface_h
