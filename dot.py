@@ -5,6 +5,8 @@ from mobjects.mobjects import Circle, Square, Polygon, Dot, GlowingDot, Point, G
 from animations.animation import Transform, Move, Rotate, Scale, ColorChange, FadeIn, FadeOut, Fade
 from math import pi
 from utilities.color import *
+from utilities.rate_functions import *
+from animations.updaters import *
 
 WIDTH, HEIGHT, FPS = 4096, 2160, 60
 # Create Cairo surface and context
@@ -30,6 +32,9 @@ class dot_scene(Scene):
         group = VGroup(*mobjects) """
         """ self.add(circle) """
         print("Dot color", dot.fill_color)
+
+        dot.add_updater(scale_continuous)
+
         self.add(dot)
         self.wait(1)
         self.play(ColorChange(dot, target_fill_color= BLUE))
@@ -38,13 +43,21 @@ class dot_scene(Scene):
         self.wait(1)
         self.play(ColorChange(dot, target_fill_color= RED))
         print("Dot color", dot.fill_color)
-        self.wait(1)
+        self.wait(1) 
         
         self.play(Move(dot, np.array([3*WIDTH/4, HEIGHT/2])))
-        self.play(Move(dot, np.array([WIDTH/2, HEIGHT/2])))
+        self.play(Move(dot, np.array([WIDTH/2, HEIGHT/2]))) 
 
         self.wait(1)
-        self.play(Scale(dot, 3)) 
+        self.play(Scale(dot, 3))
+        self.play(Scale(dot, 1.5))
+
+        for i in range(100):
+            dot.run_updates(dt = 4/100, scale_speed = 2/4, iteration = i)
+            self.render_frame("output", True)
+
+        self.wait(1)
+
 
 
         self.wait(1)

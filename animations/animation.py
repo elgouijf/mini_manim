@@ -78,7 +78,13 @@ class Scale(Animation):
         self.mobject.scale(s)
 
     def finish(self):
-        self.interpolate(1)
+        if isinstance(self.mobject, mbj.GlowingDot):
+            # reset mobject to starting state at the beginning of animation
+            self.mobject.set_points(self.starting_mobject.points)
+            self.mobject.scale_close(self.target_scale)
+
+        else:
+            self.interpolate(1)
 
 
 class Rotate(Animation):

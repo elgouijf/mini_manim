@@ -30,7 +30,7 @@ def move_continuous(mobj, direction = right, dt= 0.1, lin_speed = 3):
         mobj.move_to(x - lin_speed * dt, y)
 
 
-def scale_continous(mobj, dt = 0.1, scale_speed = 0.3, iteration = 0):
+def scale_continuous(mobj, dt = 0.1, scale_speed = 0.3, iteration = 0):
     if not mobj.scale_caracteristic:
         mobj.scale(1 + scale_speed * dt * iteration)
     else:

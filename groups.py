@@ -25,7 +25,7 @@ class Group_scene(Scene):
 
         Double_star.add_updater(rotate_continuous)
         Double_star.add_updater(move_continuous)
-        Double_star.add_updater(scale_continous)
+        Double_star.add_updater(scale_continuous)
         print(Double_star.updaters)
         center = Double_star.get_center()
 
@@ -38,7 +38,6 @@ class Group_scene(Scene):
         self.play(Rotate(Double_star, 2*pi, rate_time= 4))
         self.play(Scale(dot1, 1.5))
         for i in range(100):
-            dt = 4/100
             Double_star.run_updates(dt = 4/100, ang_speed = (np.pi)/2, lin_speed = 200, direction = right, scale_speed =1/100, iteration = i)
            
             self.render_frame("output", True)

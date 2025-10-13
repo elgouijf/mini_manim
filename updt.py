@@ -20,7 +20,7 @@ class non_slip_bearing(Scene):
         square = Square(center = np.array([WIDTH/2, HEIGHT/2]),side_len= 100.0, fill_color = BLUE, stroke_color= BLUE)
         square.add_updater(move_continuous)
         square.add_updater(rotate_continuous)
-        square.add_updater(scale_continous)
+        square.add_updater(scale_continuous)
         self.add(square)
         self.wait(1)
         for i in range(100):

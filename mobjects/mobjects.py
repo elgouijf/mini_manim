@@ -284,11 +284,11 @@ class Group(Mobject):
             child_center = mobj.get_center()
             # 1) Scale child around its own center
             mobj.scale(s)
-            mobj.apply_transform()
+            
             # 2) Reposition child so that it appears scaled about the group center
             new_center = group_center + s * (child_center - group_center)
             mobj.move_to(new_center[0], new_center[1])
-            mobj.apply_transform()
+            
         self.refresh_points()
 
 
@@ -564,10 +564,31 @@ class GlowingDot(VGroup):
             self.add_objs(circle)
 
     def scale(self, s):
-        for i in range(len(self.original_circles)):
-            circle = deepcopy(self.original_circles[i])
+        """
+        Safely scale the glowing dot and its glow layers, avoiding cumulative scaling explosion.
+        Rebuilds layers each time from original definitions.
+        """
+        # Clear current submobjects (the current circles)
+        self.submobjects = []
+
+        # Recreate from original circles (stored at construction)
+        for orig_circle in self.original_circles:
+            circle = deepcopy(orig_circle)
+            # Apply scale directly to the base geometry
             circle.scale(s)
-            self.submobjects[i] = circle
+            self.add_objs(circle)
+
+        # Rebuild glow layers (optional but keeps halo proportional)
+        # Scale the glow radius proportionally
+        self.glow_radius = self.original_glow_radius * s
+        self.radius = self.original_radius * s
+        self.original_caracteristic *= s
+
+    def scale_close(self,s):
+        # Scale all submobjects (core + glow layers) around the group's center
+        for i in range(len(self.submobjects)):
+            self.original_circles[i].scale(s)
+            self.submobjects[i] = self.original_circles[i]
 
         
 class FunctionGraph(VMobject):
@@ -892,6 +913,8 @@ class Text(VMobject) :
         self.temp_surface = None  # Placeholder for the rendered surface
         self.use_latex = use_latex
         self._surface =  surface  # Placeholder for the rendered surface
+        self.original_caracteristic = font_size
+        
     def generate_points(self):
         """ Generates the points of the text using the context's text_path method """
         ctx = self.ctx
@@ -908,6 +931,7 @@ class Text(VMobject) :
         sub_paths = []
         curr_subpath = []
         prev_point = None
+        
 
         for type,coords in path_data:
             if type == cairo.PATH_MOVE_TO :#if there is an existingb subpath
