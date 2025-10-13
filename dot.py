@@ -33,11 +33,14 @@ class dot_scene(Scene):
         """ self.add(circle) """
         print("Dot color", dot.fill_color)
 
-        dot.add_updater(scale_continuous)
+        """ dot.add_updater(scale_continuous) """
+        circle.add_updater(scale_continuous)
 
-        self.add(dot)
+
+        """ self.add(dot) """
+        self.add(circle)
         self.wait(1)
-        self.play(ColorChange(dot, target_fill_color= BLUE))
+        """ self.play(ColorChange(dot, target_fill_color= BLUE))
         print("Dot color", dot.fill_color)
         print("Dot circle color", dot.submobjects[0].fill_color)
         self.wait(1)
@@ -50,11 +53,16 @@ class dot_scene(Scene):
 
         self.wait(1)
         self.play(Scale(dot, 3))
+        self.wait(1)
         self.play(Scale(dot, 1.5))
+        self.wait(1) """
 
         for i in range(100):
-            dot.run_updates(dt = 4/100, scale_speed = 2/4, iteration = i)
+            print(i)
+            circle.run_updates(dt = 4/100, scale_speed = 1/100, iteration = i, n_iterations = 99)
             self.render_frame("output", True)
+        self.wait(1)
+        """ self.play(Scale(dot, 1.5))  """
 
         self.wait(1)
 

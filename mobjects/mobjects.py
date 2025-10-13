@@ -127,12 +127,20 @@ class Mobject:
         
         self.transform_matrix = scaling_matrix @ self.transform_matrix
         if not self.scale_caracteristic:
+            print("but we are changing the scale caracteristic\n")
+            print("\n")
+            print("\n")
+
             self.scale_caracteristic = s* self.original_caracteristic
+            print(self.scale_caracteristic)
+            print("\n")
+            print("\n")
         else:
             self.scale_caracteristic *= s
+        print("this is the scale caracteristic :", self.scale_caracteristic)
 
     def rotate(self, theta, center = None):
-        print("Rotating mobject")
+        """ print("Rotating mobject") """
         if center is None:
             center = self.get_center()
         T1 = self.get_translation_matrix(*(-center)) # This grants us a shift-back to the origin before rotating
@@ -294,7 +302,7 @@ class Group(Mobject):
 
 
     def rotate(self, theta, center = None):
-        print("Rotating group")
+        """ print("Rotating group") """
         if center is None:
             center = self.get_center()
         
@@ -483,7 +491,7 @@ class VGroup(Group, VMobject): # Group must come first for methods to follow MRO
         Group.scale(self, s)
     
     def rotate(self, theta, center = None):
-        print("Rotating VGROUP")
+        """ print("Rotating VGROUP") """
         Group.rotate(self, theta, center)
 
     def move_to(self, x, y):
@@ -524,7 +532,7 @@ class Dot(Point):
         self.set_points(circle.points)  # Set the points of the dot to the points of the circle
         
         
-class GlowingDot(VGroup):
+class GlowingDot(VGroup, Mobject):
     def __init__(self, radius=1e-5, position=np.array([0,0]), glow_radius=0.2, **settings):
         dot = Dot(radius=radius, position=position, **settings)
         super().__init__(dot, **settings)
@@ -537,7 +545,7 @@ class GlowingDot(VGroup):
         self.original_circles = [dot]
         self.generate_glowing_dot()
         self.pre_state = deepcopy(self.points)
-        self.original_caracteristic = radius
+        self.original_caracteristic = self.radius
 
 
     def generate_glowing_dot(self):
@@ -570,7 +578,7 @@ class GlowingDot(VGroup):
         """
         # Clear current submobjects (the current circles)
         self.submobjects = []
-
+        print("scaling go brrrrr")
         # Recreate from original circles (stored at construction)
         for orig_circle in self.original_circles:
             circle = deepcopy(orig_circle)
@@ -581,14 +589,25 @@ class GlowingDot(VGroup):
         # Rebuild glow layers (optional but keeps halo proportional)
         # Scale the glow radius proportionally
         self.glow_radius = self.original_glow_radius * s
-        self.radius = self.original_radius * s
-        self.original_caracteristic *= s
+        if not self.scale_caracteristic:
+            self.scale_caracteristic = s* self.original_caracteristic
+        else:
+            self.scale_caracteristic *= s
+        print("this is the scaling caracteristic:", self.scale_caracteristic)
+        print("this is the glow radius:", self.glow_radius)
+
 
     def scale_close(self,s):
         # Scale all submobjects (core + glow layers) around the group's center
         for i in range(len(self.submobjects)):
             self.original_circles[i].scale(s)
             self.submobjects[i] = self.original_circles[i]
+        self.glow_radius = self.original_glow_radius * s
+        self.radius = self.original_radius * s
+        self.original_caracteristic *= s
+
+    def run_updates(self, **kwargs):
+        Mobject.run_updates(self, **kwargs)
 
         
 class FunctionGraph(VMobject):
@@ -786,7 +805,7 @@ class Circle(VMobject):
         self.n_segments = n_segments
         self.generate_circle(n_bezier_points)
         self.pre_state = deepcopy(self.points)
-        self.original_caracteristic = radius
+        self.original_caracteristic = self.radius
 
 
     def generate_circle(self, n_bezier_points):
@@ -832,7 +851,8 @@ class Square(VMobject):
         self.side_len = side_len
         self.generate_square(center, self.side_len, n_points)
         self.pre_state = deepcopy(self.points)
-        self.original_caracteristic = side_len
+        self.original_caracteristic = self.side_len
+
 
     
     def generate_square(self, center, side_len = 2.0, n_points = None):
@@ -866,7 +886,7 @@ class Polygon(VMobject):
         self.close()
         self.generate_polygon(center, n, radius)
         self.pre_state = deepcopy(self.points)
-        self.original_caracteristic = radius
+        self.original_caracteristic = self.radius
         self.close()
 
         

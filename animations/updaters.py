@@ -30,13 +30,37 @@ def move_continuous(mobj, direction = right, dt= 0.1, lin_speed = 3):
         mobj.move_to(x - lin_speed * dt, y)
 
 
-def scale_continuous(mobj, dt = 0.1, scale_speed = 0.3, iteration = 0):
+def scale_continuous(mobj, dt = 0.1, scale_speed = 0.3, iteration = 0, n_iterations = 1):
     if not mobj.scale_caracteristic:
-        mobj.scale(1 + scale_speed * dt * iteration)
+        if iteration == n_iterations:
+            print(mobj.scale_caracteristic)
+            print("we here (if)")
+            if not isinstance(mobj, mbj.GlowingDot):
+                mobj.scale(1 + scale_speed * dt * iteration)
+            else :
+                print("scale_close called in if")
+                mobj.scale_close(1 + scale_speed * dt * iteration)
+        else: 
+            mobj.scale(1 + scale_speed * dt * iteration)
     else:
         factor = mobj.original_caracteristic / mobj.scale_caracteristic
         mobj.scale(factor)
+        if iteration == n_iterations:
+            print("we here (else)")
+            if not isinstance(mobj, mbj.GlowingDot):
+                mobj.scale(1 + scale_speed * dt * iteration)
+            else :
+                print("scale_close called in else")
+                mobj.scale_close(1 + scale_speed * dt * iteration)
+        else:
+            print 
+            mobj.scale(1 + scale_speed * dt * iteration)
+
+""" def scale_by_instance(mobj, dt, scale_speed, iteration):
+    if not isinstance(mobj, mbj.GlowingDot):
         mobj.scale(1 + scale_speed * dt * iteration)
+    else :
+        mobj.scale_close(1 + scale_speed * dt * iteration) """
 
 
 def oscillate_continous(mobj, dt = 0.1, direction = right, frequency = 2, amplitude = 1): 
