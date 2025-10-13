@@ -126,19 +126,26 @@ class Renderer:
                 if vmobject.closed:
                     self.ctx.line_to(*points[0])
                 
-                #fill options
-                r,g,b = vmobject.fill_color.get_rgb()
-                if vmobject.stroke_opacity is not None and vmobject.stroke_opacity < 1.0:    
-                    self.ctx.set_source_rgba(r,g,b,vmobject.stroke_opacity)
-                self.ctx.fill_preserve()
-                r,g,b = vmobject.stroke_color.get_rgb() 
-                self.ctx.set_source_rgba(r,g,b,vmobject.stroke_opacity)
-                #stroke options 
-                r,g,b = vmobject.stroke_color.get_rgb()
-                self.ctx.set_source_rgba(r,g,b,vmobject.stroke_opacity)
-                self.ctx.stroke()
-                if vmobject.close:
-                    self.ctx.fill_preserve()
+                # Fill options
+                if vmobject.fill_opacity and vmobject.fill_opacity > 0:
+                    r, g, b = vmobject.fill_color
+                    self.ctx.set_source_rgba(r, g, b, vmobject.fill_opacity)
+                    if vmobject.closed:
+                        self.ctx.fill_preserve()  # fill and keep path for stroke
+
+                # Stroke options
+                if vmobject.stroke_width > 0 and vmobject.stroke_opacity > 0:
+                    r, g, b = vmobject.stroke_color
+                    self.ctx.set_source_rgba(r, g, b, vmobject.stroke_opacity)
+                    self.ctx.set_line_width(vmobject.stroke_width)
+                    self.ctx.stroke()
+                else:
+                    # If no stroke, just fill (if not already filled)
+                    if vmobject.fill_opacity and vmobject.closed:
+                        r, g, b = vmobject.fill_color
+                        self.ctx.set_source_rgba(r, g, b, vmobject.fill_opacity)
+                        self.ctx.fill()
+
             else:
                 for i, subpath in enumerate(vmobject.subpaths):
                     if subpath.shape[0] == 0:
